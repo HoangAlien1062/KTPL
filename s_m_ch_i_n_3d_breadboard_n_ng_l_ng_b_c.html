@@ -1,0 +1,2230 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>Sơ đồ mạch điện 3D Breadboard - Đèn ngủ Lăng Bác</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+
+  <!-- Import Map for Three.js r160 + Official OrbitControls -->
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+        "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+      }
+    }
+  </script>
+
+  <style>
+    * {
+      box-sizing: border-box;
+      -webkit-tap-highlight-color: transparent;
+    }
+    html, body {
+      height: 100%;
+      width: 100%;
+      margin: 0;
+      padding: 0;
+      overflow: hidden;
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      background-color: #060a13;
+      color: #f8fafc;
+    }
+
+    #appShell {
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+      height: 100dvh;
+      width: 100vw;
+      overflow: hidden;
+    }
+
+    .thin-scroll::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    .thin-scroll::-webkit-scrollbar-track {
+      background: #090e1a;
+    }
+    .thin-scroll::-webkit-scrollbar-thumb {
+      background: #334155;
+      border-radius: 9999px;
+    }
+    .thin-scroll::-webkit-scrollbar-thumb:hover {
+      background: #475569;
+    }
+
+    /* Ultra-compact 10px 3D floating badge */
+    .label-3d {
+      position: absolute;
+      transform: translate(-50%, -50%);
+      pointer-events: none;
+      white-space: nowrap;
+      font-size: 10px;
+      font-weight: 600;
+      line-height: 1.1;
+      padding: 2px 5px;
+      border-radius: 4px;
+      background: rgba(11, 17, 32, 0.78);
+      backdrop-filter: blur(3px);
+      border: 1px solid rgba(148, 163, 184, 0.45);
+      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.45);
+      letter-spacing: 0.01em;
+    }
+
+    #mainSplit {
+      flex: 1 1 auto;
+      min-height: 0;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+    @media (min-width: 960px) {
+      #mainSplit {
+        flex-direction: row;
+      }
+    }
+
+    #viewportSection {
+      flex: 1 1 58%;
+      min-width: 0;
+      min-height: 0;
+      display: flex;
+      flex-direction: column;
+      position: relative;
+      background: radial-gradient(circle at 50% 42%, #131f38 0%, #060911 100%);
+    }
+    @media (min-width: 960px) {
+      #viewportSection {
+        flex: 1 1 auto;
+      }
+    }
+
+    #sidebarSection {
+      flex: 1 1 42%;
+      min-height: 0;
+      display: flex;
+      flex-direction: column;
+      background: #0b1120;
+      border-top: 1px solid #1e293b;
+    }
+    @media (min-width: 960px) {
+      #sidebarSection {
+        flex: 0 0 380px;
+        width: 380px;
+        border-top: none;
+        border-left: 1px solid #1e293b;
+      }
+    }
+
+    input[type="range"] {
+      accent-color: #f59e0b;
+      cursor: pointer;
+    }
+  </style>
+</head>
+<body>
+  <div id="appShell">
+    <!-- ==================== 1. TOP HEADER & SIMULATION CONTROLS ==================== -->
+    <header class="flex-shrink-0 bg-slate-950/95 border-b border-slate-800 px-3 py-2 z-20">
+      <div class="flex flex-wrap items-center justify-between gap-2">
+        <div class="min-w-0">
+          <div class="flex flex-wrap items-center gap-1.5 mb-0.5">
+            <span class="text-[10px] font-bold px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/30">
+              XOAY 360° TỰ DO
+            </span>
+            <span class="text-[10px] font-bold px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+              CHUẨN CHÂN ESP32-C3 (TRÁNH STRAPPING)
+            </span>
+            <span class="text-[10px] font-bold px-2 py-0.5 rounded bg-purple-500/20 text-purple-300 border border-purple-500/30">
+              5 DÂY LUỒN CỘT LÊN NÓC
+            </span>
+          </div>
+          <h1 class="text-xs sm:text-sm font-extrabold text-white truncate">
+            Mô Hình 3D: Đèn Ngủ Lăng Bác 2 Tầng (Chạm Xuyên Gỗ &amp; Sạc Xả 5V 2A)
+          </h1>
+        </div>
+
+        <div class="flex flex-wrap items-center gap-1.5">
+          <button id="btnTouch"
+            class="px-2.5 py-1.5 rounded-lg text-xs font-bold bg-amber-500/25 border border-amber-400 text-amber-200 hover:bg-amber-500/35 active:scale-95 transition flex items-center gap-1">
+            <span>👆</span><span id="touchLabel">Chạm Nóc Lăng: Đèn Sáng</span>
+          </button>
+
+          <button id="btnSleep"
+            class="px-2.5 py-1.5 rounded-lg text-xs font-bold bg-emerald-600 border border-emerald-400 text-white hover:bg-emerald-500 active:scale-95 transition flex items-center gap-1">
+            <span>😴</span><span id="sleepLabel">Giữ Nóc 2s: Đang THỨC</span>
+          </button>
+
+          <div class="flex items-center gap-1.5 bg-slate-900 border border-slate-700 px-2 py-1 rounded-lg text-xs">
+            <span class="text-slate-400 font-semibold">Sáng PWM:</span>
+            <input id="brightnessSlider" type="range" min="10" max="100" value="90" class="w-14 sm:w-16" />
+            <span id="brightnessText" class="font-mono font-bold text-amber-400 w-8 text-right">90%</span>
+          </div>
+
+          <button id="btnCharge"
+            class="px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-slate-800 border border-slate-700 text-slate-200 hover:bg-slate-700 active:scale-95 transition flex items-center gap-1">
+            <span>🔌</span><span id="chargeLabel">Sạc Type-C</span>
+          </button>
+
+          <button id="btnAudio"
+            class="px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-sky-500/20 border border-sky-400/60 text-sky-200 hover:bg-sky-500/30 active:scale-95 transition flex items-center gap-1">
+            <span>🔊</span><span id="audioLabel">Loa BT: Phát</span>
+          </button>
+
+          <button id="btnLabels" title="Đổi chế độ nhãn tên linh kiện"
+            class="px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-indigo-500/25 border border-indigo-400/60 text-indigo-200 hover:bg-indigo-500/35 active:scale-95 transition flex items-center gap-1">
+            <span>🏷️</span><span id="labelsLabel">Nhãn: Nhỏ</span>
+          </button>
+        </div>
+      </div>
+    </header>
+
+    <!-- ==================== 2. MAIN SPLIT VIEW (LEFT 3D + RIGHT CHECKLIST) ==================== -->
+    <div id="mainSplit">
+      <!-- LEFT: 3D INTERACTIVE VIEWPORT -->
+      <section id="viewportSection">
+        <!-- Camera Preset Bar -->
+        <div class="flex-shrink-0 bg-slate-950/90 border-b border-slate-800/90 px-2.5 py-1.5 flex flex-wrap items-center justify-between gap-1.5 z-10">
+          <div class="flex flex-wrap items-center gap-1">
+            <span class="text-[11px] font-bold text-slate-400 mr-1">GÓC NHÌN:</span>
+            <button class="cam-btn px-2 py-1 rounded-md text-[11px] font-semibold bg-amber-500 text-slate-950"
+              data-cam="overview">Toàn cảnh</button>
+            <button class="cam-btn px-2 py-1 rounded-md text-[11px] font-semibold bg-slate-800 text-amber-200 border border-amber-500/30 hover:bg-slate-700"
+              data-cam="roofTop">Trên Nóc Lăng</button>
+            <button class="cam-btn px-2 py-1 rounded-md text-[11px] font-semibold bg-slate-800 text-amber-200 border border-amber-500/30 hover:bg-slate-700"
+              data-cam="underRoof">Dưới Mái Nóc</button>
+            <button class="cam-btn px-2 py-1 rounded-md text-[11px] font-semibold bg-slate-800 text-slate-200 hover:bg-slate-700"
+              data-cam="breadboard">Breadboard</button>
+            <button class="cam-btn px-2 py-1 rounded-md text-[11px] font-semibold bg-slate-800 text-slate-200 hover:bg-slate-700"
+              data-cam="power">Nguồn 5V</button>
+            <button class="cam-btn px-2 py-1 rounded-md text-[11px] font-semibold bg-slate-800 text-slate-200 hover:bg-slate-700"
+              data-cam="esp_tft">ESP32 &amp; TFT</button>
+          </div>
+
+          <div class="hidden xl:flex items-center gap-2.5 text-[11px] text-slate-400">
+            <span class="flex items-center gap-1"><i class="inline-block w-2.5 h-1.5 rounded-sm bg-red-500"></i>+5V</span>
+            <span class="flex items-center gap-1"><i class="inline-block w-2.5 h-1.5 rounded-sm bg-orange-500"></i>+3.3V</span>
+            <span class="flex items-center gap-1"><i class="inline-block w-2.5 h-1.5 rounded-sm bg-sky-500"></i>GND</span>
+          </div>
+        </div>
+
+        <!-- 3D Canvas Container -->
+        <div id="canvasContainer" class="relative flex-1 w-full min-h-0 overflow-hidden cursor-grab active:cursor-grabbing select-none">
+          <canvas id="threeCanvas" class="block w-full h-full"></canvas>
+
+          <!-- SVG Leader Lines + Compact 10px 3D Labels Overlay -->
+          <svg id="leaderSvg" class="absolute inset-0 w-full h-full pointer-events-none z-10"></svg>
+          <div id="labelsOverlay" class="absolute inset-0 w-full h-full pointer-events-none z-10 overflow-hidden"></div>
+
+          <!-- Top-Left Live Status & Hover Inspector HUD -->
+          <div id="hudBox" class="absolute top-2.5 left-2.5 right-14 sm:right-auto sm:max-w-lg z-20 pointer-events-none bg-slate-950/85 border border-slate-700/80 rounded-lg px-2.5 py-1.5 flex items-center gap-2 shadow-lg backdrop-blur-sm">
+            <span id="hudIndicator" class="w-2.5 h-2.5 rounded-full flex-shrink-0 bg-emerald-400 shadow-[0_0_8px_#34d399]"></span>
+            <span id="hudStatusText" class="font-mono text-[11px] font-semibold text-slate-200 truncate">
+              THỨC: Bo sạc xuất 5.0V • LED 90%
+            </span>
+          </div>
+
+          <!-- Bottom-Right Navigation Pad (D-Pad Pan + Zoom + Reset) -->
+          <div class="absolute bottom-2.5 right-2.5 z-20 flex items-end gap-1.5">
+            <div class="bg-slate-900/85 backdrop-blur-sm border border-slate-700/80 rounded-xl p-1 shadow-xl grid grid-cols-3 gap-0.5">
+              <div></div>
+              <button data-pan="up" title="Di chuyển lên (W / ↑)"
+                class="nav-pan-btn w-6 h-6 rounded bg-slate-800/90 hover:bg-slate-700 active:bg-amber-500 active:text-slate-950 text-slate-200 text-xs font-bold flex items-center justify-center">
+                ↑
+              </button>
+              <div></div>
+              <button data-pan="left" title="Di chuyển trái (A / ←)"
+                class="nav-pan-btn w-6 h-6 rounded bg-slate-800/90 hover:bg-slate-700 active:bg-amber-500 active:text-slate-950 text-slate-200 text-xs font-bold flex items-center justify-center">
+                ←
+              </button>
+              <button id="btnResetView" title="Về Toàn cảnh (Phím R)"
+                class="w-6 h-6 rounded bg-amber-500/20 border border-amber-500/50 hover:bg-amber-500 hover:text-slate-950 text-amber-300 text-xs font-bold flex items-center justify-center">
+                ⌂
+              </button>
+              <button data-pan="right" title="Di chuyển phải (D / →)"
+                class="nav-pan-btn w-6 h-6 rounded bg-slate-800/90 hover:bg-slate-700 active:bg-amber-500 active:text-slate-950 text-slate-200 text-xs font-bold flex items-center justify-center">
+                →
+              </button>
+              <div></div>
+              <button data-pan="down" title="Di chuyển xuống (S / ↓)"
+                class="nav-pan-btn w-6 h-6 rounded bg-slate-800/90 hover:bg-slate-700 active:bg-amber-500 active:text-slate-950 text-slate-200 text-xs font-bold flex items-center justify-center">
+                ↓
+              </button>
+              <div></div>
+            </div>
+
+            <div class="bg-slate-900/85 backdrop-blur-sm border border-slate-700/80 rounded-xl p-1 shadow-xl flex flex-col gap-1">
+              <button id="btnZoomIn" title="Phóng to (+)"
+                class="w-7 h-7 rounded-lg bg-slate-800/90 hover:bg-slate-700 hover:text-amber-300 active:scale-95 text-white text-base font-bold flex items-center justify-center">
+                +
+              </button>
+              <button id="btnZoomOut" title="Thu nhỏ (-)"
+                class="w-7 h-7 rounded-lg bg-slate-800/90 hover:bg-slate-700 hover:text-amber-300 active:scale-95 text-white text-base font-bold flex items-center justify-center">
+                −
+              </button>
+            </div>
+          </div>
+
+          <!-- Selected Wire Inspector Card -->
+          <div id="wireInspector"
+            class="hidden absolute bottom-2.5 left-2.5 right-36 sm:right-auto sm:max-w-sm z-20 bg-slate-950/95 border border-amber-500/60 rounded-xl p-2.5 shadow-2xl backdrop-blur">
+            <div class="flex items-center justify-between gap-2 mb-1">
+              <div class="flex items-center gap-1.5 min-w-0">
+                <span id="inspGroupBadge" class="text-[10px] font-bold px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300">B1</span>
+                <span id="inspTitle" class="text-xs font-bold text-white truncate">Tên sợi dây</span>
+              </div>
+              <button id="btnCloseInspector" class="text-slate-400 hover:text-white text-xs font-bold px-1.5 py-0.5 rounded bg-slate-800">
+                ✕
+              </button>
+            </div>
+            <div class="grid grid-cols-1 gap-1 text-[11px]">
+              <div class="bg-slate-900/90 border border-slate-800 rounded-md px-2 py-1 flex items-center gap-1.5">
+                <span class="font-mono text-[10px] font-bold px-1.5 py-0.2 rounded bg-amber-500/20 text-amber-300">ĐẦU A</span>
+                <span id="inspFrom" class="text-slate-200 font-medium truncate">...</span>
+              </div>
+              <div class="bg-slate-900/90 border border-slate-800 rounded-md px-2 py-1 flex items-center gap-1.5">
+                <span class="font-mono text-[10px] font-bold px-1.5 py-0.2 rounded bg-sky-500/20 text-sky-300">ĐẦU B</span>
+                <span id="inspTo" class="text-slate-200 font-medium truncate">...</span>
+              </div>
+            </div>
+            <p id="inspNote" class="text-[11px] text-slate-400 mt-1.5 leading-snug"></p>
+          </div>
+        </div>
+      </section>
+
+      <!-- RIGHT: 31-WIRE VERIFIED CHECKLIST PANEL -->
+      <aside id="sidebarSection">
+        <div class="flex-shrink-0 px-3 py-2 bg-slate-900/90 border-b border-slate-800 flex items-center justify-between gap-2">
+          <div>
+            <h2 class="text-xs sm:text-sm font-extrabold text-white">Bảng tiến độ 31 mối nối chuẩn</h2>
+            <p class="text-[11px] text-slate-400">Bấm dòng để soi 3D • Tích ô để lưu tiến độ</p>
+          </div>
+          <div class="flex items-center gap-1.5">
+            <span id="progressBadge"
+              class="font-mono text-xs font-bold px-2.5 py-1 rounded-lg bg-emerald-500/20 text-emerald-300 border border-emerald-500/40">
+              0 / 31
+            </span>
+            <button id="btnResetProgress" title="Đặt lại tiến độ"
+              class="text-[11px] font-semibold px-2 py-1 rounded-lg bg-slate-800 text-slate-300 hover:bg-slate-700 border border-slate-700">
+              Đặt lại
+            </button>
+          </div>
+        </div>
+
+        <div id="filterTabs" class="flex-shrink-0 px-2.5 py-1.5 bg-slate-950/80 border-b border-slate-800 flex flex-wrap gap-1">
+          <button class="tab-btn px-2 py-1 rounded-md text-[11px] font-bold bg-amber-500 text-slate-950"
+            data-filter="ALL">Tất cả (31)</button>
+          <button class="tab-btn px-2 py-1 rounded-md text-[11px] font-semibold bg-slate-800 text-amber-300 border border-amber-500/40 hover:bg-slate-700"
+            data-filter="ROOF">🏛️ 5 Dây Nóc</button>
+          <button class="tab-btn px-2 py-1 rounded-md text-[11px] font-semibold bg-slate-800 text-slate-300 hover:bg-slate-700"
+            data-filter="B1">B1: Nguồn</button>
+          <button class="tab-btn px-2 py-1 rounded-md text-[11px] font-semibold bg-slate-800 text-slate-300 hover:bg-slate-700"
+            data-filter="B2">B2: ESP32</button>
+          <button class="tab-btn px-2 py-1 rounded-md text-[11px] font-semibold bg-slate-800 text-slate-300 hover:bg-slate-700"
+            data-filter="B3">B3: TFT 1.8"</button>
+          <button class="tab-btn px-2 py-1 rounded-md text-[11px] font-semibold bg-slate-800 text-slate-300 hover:bg-slate-700"
+            data-filter="B4">B4: Cảm biến</button>
+          <button class="tab-btn px-2 py-1 rounded-md text-[11px] font-semibold bg-slate-800 text-slate-300 hover:bg-slate-700"
+            data-filter="B5">B5: LED &amp; Loa</button>
+        </div>
+
+        <div id="checklistContainer" class="flex-1 min-h-0 overflow-y-auto thin-scroll p-2 space-y-1.5"></div>
+      </aside>
+    </div>
+
+    <!-- ==================== 3. BOTTOM CONTROLS HINT BAR ==================== -->
+    <footer class="flex-shrink-0 bg-slate-950 border-t border-slate-800 px-3 py-1.5 text-center z-20">
+      <p class="text-[11px] sm:text-xs font-medium text-slate-300 truncate">
+        🖱️ <span class="text-white font-semibold">Chuột trái + kéo:</span> Xoay tự do 360° &nbsp;•&nbsp;
+        <span class="text-white font-semibold">Chuột phải + kéo:</span> Di chuyển khung &nbsp;•&nbsp;
+        <span class="text-white font-semibold">Lăn chuột:</span> Phóng to/nhỏ &nbsp;•&nbsp;
+        <span class="text-amber-300 font-semibold">Nhấp đúp:</span> Zoom tới linh kiện
+      </p>
+    </footer>
+  </div>
+
+  <script type="module">
+    import * as THREE from 'three';
+    import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+    // =========================================================================
+    // 1. STATE & LOCALSTORAGE PERSISTENCE
+    // =========================================================================
+    const STORAGE_KEY = 'lang_bac_31_wires_v3';
+    let checkedSet = new Set();
+    try {
+      const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
+      if (Array.isArray(saved)) checkedSet = new Set(saved);
+    } catch (e) {
+      checkedSet = new Set();
+    }
+
+    function saveProgress() {
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify([...checkedSet]));
+      } catch (e) {}
+    }
+
+    const appState = {
+      ledOn: true,
+      deepSleep: false,
+      brightness: 90,
+      charging: false,
+      audioPlaying: true,
+      labelMode: 'compact', // 'compact' | 'hover' | 'hidden'
+      activeFilter: 'ALL',
+      selectedWireId: null,
+      hoveredWireId: null,
+      hoveredComponentId: null
+    };
+
+    // =========================================================================
+    // 2. THREE.JS SCENE & UNRESTRICTED 360° SPHERICAL ORBIT CONTROLS
+    // =========================================================================
+    const canvas = document.getElementById('threeCanvas');
+    const container = document.getElementById('canvasContainer');
+
+    const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+
+    const scene = new THREE.Scene();
+
+    const camera = new THREE.PerspectiveCamera(42, 16 / 10, 0.1, 120);
+    camera.position.set(0.3, 7.2, 13.8);
+
+    const controls = new OrbitControls(camera, renderer.domElement);
+    controls.enableDamping = true;
+    controls.dampingFactor = 0.07;
+    controls.screenSpacePanning = true;
+    controls.rotateSpeed = 0.85;
+    controls.panSpeed = 0.9;
+    controls.zoomSpeed = 1.15;
+    // Unrestricted 360-degree horizontal & full top-to-underneath vertical spherical orbit
+    controls.minAzimuthAngle = -Infinity;
+    controls.maxAzimuthAngle = Infinity;
+    controls.minPolarAngle = 0.01;
+    controls.maxPolarAngle = Math.PI * 0.96;
+    controls.minDistance = 2.0;
+    controls.maxDistance = 32.0;
+    controls.target.set(0.3, 2.4, -0.2);
+    controls.update();
+
+    const camAnim = {
+      active: false,
+      goalTarget: new THREE.Vector3(0.3, 2.4, -0.2),
+      goalPos: new THREE.Vector3(0.3, 7.2, 13.8)
+    };
+
+    controls.addEventListener('start', () => {
+      camAnim.active = false;
+    });
+
+    const CAMERA_PRESETS = {
+      overview:   { target: [0.3, 2.4, -0.2],  pos: [0.3, 7.2, 13.8] },
+      roofTop:    { target: [2.2, 4.9, -0.6],  pos: [2.2, 9.5, 3.0] },
+      underRoof:  { target: [2.2, 4.8, -0.6],  pos: [0.2, 3.2, 2.9] },
+      breadboard: { target: [0.2, 0.4, 0.6],   pos: [0.2, 7.2, 1.8] },
+      power:      { target: [-4.4, 0.4, -0.2], pos: [-6.4, 3.8, 4.6] },
+      esp_tft:    { target: [-0.1, 0.9, -0.2], pos: [0.4, 3.9, 5.2] }
+    };
+
+    function flyCameraTo(targetVec, posVec) {
+      camAnim.goalTarget.copy(targetVec);
+      camAnim.goalPos.copy(posVec);
+      camAnim.active = true;
+    }
+
+    function setCameraPreset(key) {
+      const p = CAMERA_PRESETS[key];
+      if (!p) return;
+      flyCameraTo(
+        new THREE.Vector3(p.target[0], p.target[1], p.target[2]),
+        new THREE.Vector3(p.pos[0], p.pos[1], p.pos[2])
+      );
+      document.querySelectorAll('.cam-btn').forEach(btn => {
+        const active = btn.dataset.cam === key;
+        if (active) {
+          btn.className = 'cam-btn px-2 py-1 rounded-md text-[11px] font-semibold bg-amber-500 text-slate-950';
+        } else if (btn.dataset.cam === 'roofTop' || btn.dataset.cam === 'underRoof') {
+          btn.className = 'cam-btn px-2 py-1 rounded-md text-[11px] font-semibold bg-slate-800 text-amber-200 border border-amber-500/30 hover:bg-slate-700';
+        } else {
+          btn.className = 'cam-btn px-2 py-1 rounded-md text-[11px] font-semibold bg-slate-800 text-slate-200 hover:bg-slate-700';
+        }
+      });
+    }
+
+    function panScreen(dx, dy) {
+      camAnim.active = false;
+      const forward = new THREE.Vector3();
+      camera.getWorldDirection(forward);
+      const right = new THREE.Vector3().crossVectors(forward, camera.up).normalize();
+      const up = new THREE.Vector3().crossVectors(right, forward).normalize();
+      const distScale = camera.position.distanceTo(controls.target) * 0.045;
+
+      const offset = new THREE.Vector3()
+        .addScaledVector(right, dx * distScale)
+        .addScaledVector(up, dy * distScale);
+
+      controls.target.add(offset);
+      camera.position.add(offset);
+    }
+
+    function zoomStep(factor) {
+      camAnim.active = false;
+      const offset = new THREE.Vector3().subVectors(camera.position, controls.target);
+      const newLen = Math.max(controls.minDistance, Math.min(controls.maxDistance, offset.length() * factor));
+      offset.setLength(newLen);
+      camera.position.copy(controls.target).add(offset);
+    }
+
+    // =========================================================================
+    // 3. LIGHTING & BASE CHASSIS
+    // =========================================================================
+    const ambientLight = new THREE.AmbientLight(0xdbeafe, 0.78);
+    scene.add(ambientLight);
+
+    const dirLight = new THREE.DirectionalLight(0xffffff, 0.88);
+    dirLight.position.set(6, 15, 9);
+    dirLight.castShadow = true;
+    dirLight.shadow.mapSize.width = 1024;
+    dirLight.shadow.mapSize.height = 1024;
+    scene.add(dirLight);
+
+    const fillLight = new THREE.DirectionalLight(0x93c5fd, 0.35);
+    fillLight.position.set(-8, 6, -6);
+    scene.add(fillLight);
+
+    const roofWarmLight = new THREE.PointLight(0xffb703, 1.8, 7.5, 1.6);
+    roofWarmLight.position.set(2.2, 4.45, -1.1);
+    scene.add(roofWarmLight);
+
+    const gridHelper = new THREE.GridHelper(16, 16, 0x1e293b, 0x0f172a);
+    gridHelper.position.y = 0.0;
+    scene.add(gridHelper);
+
+    const rootGroup = new THREE.Group();
+    scene.add(rootGroup);
+
+    const basePlatform = new THREE.Mesh(
+      new THREE.BoxGeometry(11.4, 0.24, 6.8),
+      new THREE.MeshStandardMaterial({ color: 0x0f172a, roughness: 0.75, metalness: 0.15 })
+    );
+    basePlatform.position.set(-0.1, 0.12, 0.45);
+    basePlatform.receiveShadow = true;
+    rootGroup.add(basePlatform);
+
+    // =========================================================================
+    // 4. 400-HOLE MB-102 BREADBOARD AT (0.2, 0.15, 0.6)
+    // =========================================================================
+    const BB = {
+      cx: 0.2,
+      cz: 0.6,
+      width: 4.6,
+      height: 0.22,
+      depth: 3.2,
+      bottomY: 0.24,
+      topY: 0.46,
+      pitch: 0.145
+    };
+
+    function colX(col) {
+      return BB.cx + (col - 15.5) * BB.pitch;
+    }
+
+    const ROW_Z = {
+      'TOP-': BB.cz - 1.38,
+      'TOP+': BB.cz - 1.19,
+      'A':    BB.cz - 0.88,
+      'B':    BB.cz - 0.735,
+      'C':    BB.cz - 0.59,
+      'D':    BB.cz - 0.445,
+      'E':    BB.cz - 0.30,
+      'F':    BB.cz + 0.30,
+      'G':    BB.cz + 0.445,
+      'H':    BB.cz + 0.59,
+      'I':    BB.cz + 0.735,
+      'J':    BB.cz + 0.88,
+      'BOT+': BB.cz + 1.19,
+      'BOT-': BB.cz + 1.38
+    };
+
+    function bbHole(row, col) {
+      return new THREE.Vector3(colX(col), BB.topY, ROW_Z[row]);
+    }
+
+    function createBreadboardTopTexture() {
+      const c = document.createElement('canvas');
+      c.width = 1024;
+      c.height = 712;
+      const g = c.getContext('2d');
+
+      g.fillStyle = '#f1f5f9';
+      g.fillRect(0, 0, 1024, 712);
+
+      g.fillStyle = '#cbd5e1';
+      g.fillRect(16, 318, 992, 76);
+
+      const toPxX = (xWorld) => ((xWorld - (BB.cx - BB.width * 0.5)) / BB.width) * 1024;
+      const toPxZ = (zWorld) => ((zWorld - (BB.cz - BB.depth * 0.5)) / BB.depth) * 712;
+
+      const drawStripe = (zWorld, color) => {
+        g.fillStyle = color;
+        g.fillRect(36, toPxZ(zWorld) - 3, 952, 6);
+      };
+      drawStripe(ROW_Z['TOP-'] - 0.09, '#2563eb');
+      drawStripe(ROW_Z['TOP+'] + 0.09, '#dc2626');
+      drawStripe(ROW_Z['BOT+'] - 0.09, '#ea580c');
+      drawStripe(ROW_Z['BOT-'] + 0.09, '#2563eb');
+
+      g.font = 'bold 16px monospace';
+      g.textAlign = 'center';
+      g.textBaseline = 'middle';
+      ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J'].forEach(r => {
+        const py = toPxZ(ROW_Z[r]);
+        g.fillStyle = '#475569';
+        g.fillText(r, 20, py);
+        g.fillText(r, 1004, py);
+      });
+
+      g.font = 'bold 14px monospace';
+      g.fillStyle = '#2563eb';
+      g.fillText('-', 20, toPxZ(ROW_Z['TOP-']));
+      g.fillText('-', 20, toPxZ(ROW_Z['BOT-']));
+      g.fillStyle = '#dc2626';
+      g.fillText('+5V', 22, toPxZ(ROW_Z['TOP+']));
+      g.fillStyle = '#ea580c';
+      g.fillText('+3V', 22, toPxZ(ROW_Z['BOT+']));
+
+      g.fillStyle = '#334155';
+      g.font = 'bold 15px monospace';
+      [1, 5, 10, 15, 20, 25, 30].forEach(col => {
+        const px = toPxX(colX(col));
+        g.fillText(String(col), px, toPxZ(ROW_Z['A']) - 22);
+        g.fillText(String(col), px, toPxZ(ROW_Z['J']) + 22);
+      });
+
+      const tex = new THREE.CanvasTexture(c);
+      tex.anisotropy = 4;
+      return tex;
+    }
+
+    let breadboardBodyMesh = null;
+
+    function buildBreadboard() {
+      const grp = new THREE.Group();
+      const sideMat = new THREE.MeshStandardMaterial({ color: 0xe2e8f0, roughness: 0.6 });
+      const topMat = new THREE.MeshStandardMaterial({ map: createBreadboardTopTexture(), roughness: 0.55 });
+
+      breadboardBodyMesh = new THREE.Mesh(
+        new THREE.BoxGeometry(BB.width, BB.height, BB.depth),
+        [sideMat, sideMat, topMat, sideMat, sideMat, sideMat]
+      );
+      breadboardBodyMesh.position.set(BB.cx, BB.bottomY + BB.height * 0.5, BB.cz);
+      breadboardBodyMesh.castShadow = true;
+      breadboardBodyMesh.receiveShadow = true;
+      grp.add(breadboardBodyMesh);
+
+      const holeGeo = new THREE.BoxGeometry(0.055, 0.015, 0.055);
+      const holeMat = new THREE.MeshBasicMaterial({ color: 0x0f172a });
+      const holePositions = [];
+
+      for (let c = 1; c <= 30; c++) {
+        if (c % 6 !== 0) {
+          holePositions.push(bbHole('TOP-', c), bbHole('TOP+', c), bbHole('BOT+', c), bbHole('BOT-', c));
+        }
+        ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J'].forEach(r => {
+          holePositions.push(bbHole(r, c));
+        });
+      }
+
+      const instHoles = new THREE.InstancedMesh(holeGeo, holeMat, holePositions.length);
+      const dummy = new THREE.Object3D();
+      holePositions.forEach((pos, i) => {
+        dummy.position.set(pos.x, pos.y + 0.003, pos.z);
+        dummy.updateMatrix();
+        instHoles.setMatrixAt(i, dummy.matrix);
+      });
+      grp.add(instHoles);
+      rootGroup.add(grp);
+    }
+    buildBreadboard();
+
+    // =========================================================================
+    // 5. HARDWARE MODULES (BASE, HOLLOW COLUMN, & 3-TIER WOODEN ROOF)
+    // =========================================================================
+    const PINS = {};
+    const componentPickMeshes = [];
+    const componentMeshGroups = new Map();
+
+    function registerComponentGroup(id, info, meshes) {
+      componentMeshGroups.set(id, { info, meshes });
+      meshes.forEach(m => {
+        m.userData.compId = id;
+        m.userData.compInfo = info;
+        componentPickMeshes.push(m);
+      });
+    }
+
+    function buildPowerAndAudioModules() {
+      // 1. 18650 Battery Holder + 3.7V Cell at (-4.8, 0.25, -1.2)
+      const holder = new THREE.Mesh(
+        new THREE.BoxGeometry(2.25, 0.36, 0.96),
+        new THREE.MeshStandardMaterial({ color: 0x1e293b, roughness: 0.65 })
+      );
+      holder.position.set(-4.8, 0.42, -1.2);
+      rootGroup.add(holder);
+
+      const cell = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.32, 0.32, 1.92, 24),
+        new THREE.MeshStandardMaterial({ color: 0x10b981, roughness: 0.35, metalness: 0.2 })
+      );
+      cell.rotation.z = Math.PI * 0.5;
+      cell.position.set(-4.8, 0.61, -1.2);
+      rootGroup.add(cell);
+
+      const posCap = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.14, 0.14, 0.1, 16),
+        new THREE.MeshStandardMaterial({ color: 0xe2e8f0, metalness: 0.8, roughness: 0.2 })
+      );
+      posCap.rotation.z = Math.PI * 0.5;
+      posCap.position.set(-3.8, 0.61, -1.2);
+      rootGroup.add(posCap);
+
+      registerComponentGroup('lbl_bat', {
+        shortName: 'Pin 18650',
+        fullName: 'Pin Lithium 18650 (3.7V–4.2V) + Đế nhựa 1 cell',
+        detail: 'Dây Đỏ (+) → B+, Dây Đen (−) → B- trên bo sạc xả 5V 2A'
+      }, [holder, cell, posCap]);
+
+      PINS.BAT_PLUS  = new THREE.Vector3(-3.68, 0.46, -1.40);
+      PINS.BAT_MINUS = new THREE.Vector3(-3.68, 0.46, -1.00);
+
+      // 2. 5V 2A Type-C Boost-Charge Board at (-4.6, 0.25, 0.7)
+      const chgPcb = new THREE.Mesh(
+        new THREE.BoxGeometry(1.65, 0.12, 1.15),
+        new THREE.MeshStandardMaterial({ color: 0x059669, roughness: 0.45 })
+      );
+      chgPcb.position.set(-4.6, 0.30, 0.7);
+      rootGroup.add(chgPcb);
+
+      const usbC = new THREE.Mesh(
+        new THREE.BoxGeometry(0.36, 0.18, 0.48),
+        new THREE.MeshStandardMaterial({ color: 0xcbd5e1, metalness: 0.85, roughness: 0.25 })
+      );
+      usbC.position.set(-5.4, 0.41, 0.7);
+      rootGroup.add(usbC);
+
+      const coil = new THREE.Mesh(
+        new THREE.BoxGeometry(0.45, 0.2, 0.45),
+        new THREE.MeshStandardMaterial({ color: 0x1e293b, roughness: 0.5 })
+      );
+      coil.position.set(-4.6, 0.45, 0.7);
+      rootGroup.add(coil);
+
+      const chgLedMat = new THREE.MeshBasicMaterial({ color: 0x38bdf8 });
+      const chgLed = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.08, 0.14), chgLedMat);
+      chgLed.position.set(-5.1, 0.38, 0.32);
+      rootGroup.add(chgLed);
+      window.chgLedMat = chgLedMat;
+
+      registerComponentGroup('lbl_chg', {
+        shortName: 'Sạc Xả 5V',
+        fullName: 'Mạch Sạc Xả Tăng Áp 5V 2A Type-C (Bo gộp)',
+        detail: 'OUT+ → Thanh Đỏ Sau (+5V), OUT- → Thanh Xanh Sau (GND)'
+      }, [chgPcb, usbC, coil]);
+
+      PINS.CHG_B_PLUS    = new THREE.Vector3(-3.86, 0.36, 0.32);
+      PINS.CHG_B_MINUS   = new THREE.Vector3(-3.86, 0.36, 0.58);
+      PINS.CHG_OUT_PLUS  = new THREE.Vector3(-3.86, 0.36, 0.86);
+      PINS.CHG_OUT_MINUS = new THREE.Vector3(-3.86, 0.36, 1.12);
+
+      // 3. Bluetooth Module MH-M38 at (-4.6, 0.25, 2.3)
+      const btPcb = new THREE.Mesh(
+        new THREE.BoxGeometry(1.48, 0.12, 0.86),
+        new THREE.MeshStandardMaterial({ color: 0x1d4ed8, roughness: 0.45 })
+      );
+      btPcb.position.set(-4.6, 0.30, 2.3);
+      rootGroup.add(btPcb);
+
+      const btChip = new THREE.Mesh(
+        new THREE.BoxGeometry(0.42, 0.08, 0.42),
+        new THREE.MeshStandardMaterial({ color: 0x0f172a })
+      );
+      btChip.position.set(-4.6, 0.38, 2.3);
+      rootGroup.add(btChip);
+
+      registerComponentGroup('lbl_bt', {
+        shortName: 'MH-M38',
+        fullName: 'Mạch Thu Âm Thanh Bluetooth MH-M38 Type-C',
+        detail: '5V → Thanh Đỏ Sau, GND → Thanh Xanh Trước, L+/L- → Loa 4R 3W'
+      }, [btPcb, btChip]);
+
+      PINS.BT_5V  = new THREE.Vector3(-3.95, 0.36, 2.04);
+      PINS.BT_GND = new THREE.Vector3(-3.95, 0.36, 2.30);
+      PINS.BT_LP  = new THREE.Vector3(-3.95, 0.36, 2.56);
+
+      // 4. Round 4R 3W 40mm Speaker at (-2.5, 0.35, 2.7)
+      const spkBody = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.66, 0.62, 0.44, 28),
+        new THREE.MeshStandardMaterial({ color: 0x1e293b, roughness: 0.55 })
+      );
+      spkBody.position.set(-2.5, 0.46, 2.7);
+      rootGroup.add(spkBody);
+
+      const spkCone = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.52, 0.24, 0.14, 24),
+        new THREE.MeshStandardMaterial({ color: 0x0f172a, roughness: 0.7 })
+      );
+      spkCone.position.set(-2.5, 0.65, 2.7);
+      rootGroup.add(spkCone);
+
+      const spkDome = new THREE.Mesh(
+        new THREE.SphereGeometry(0.21, 16, 12, 0, Math.PI * 2, 0, Math.PI * 0.5),
+        new THREE.MeshStandardMaterial({ color: 0xb45309, roughness: 0.4 })
+      );
+      spkDome.position.set(-2.5, 0.65, 2.7);
+      rootGroup.add(spkDome);
+
+      const waveRing = new THREE.Mesh(
+        new THREE.RingGeometry(0.70, 0.78, 32),
+        new THREE.MeshBasicMaterial({ color: 0x38bdf8, side: THREE.DoubleSide, transparent: true, opacity: 0.65 })
+      );
+      waveRing.rotation.x = -Math.PI * 0.5;
+      waveRing.position.set(-2.5, 0.71, 2.7);
+      rootGroup.add(waveRing);
+      window.spkWaveRing = waveRing;
+
+      registerComponentGroup('lbl_spk', {
+        shortName: 'Loa 3W',
+        fullName: 'Loa Tròn Toàn Dải 4 Ohm 3W (40mm)',
+        detail: 'Hàn trực tiếp vào giắc L+ / L- của mạch MH-M38 (cách ly GND)'
+      }, [spkBody, spkCone, spkDome]);
+
+      PINS.SPK_TERMINAL = new THREE.Vector3(-3.12, 0.44, 2.65);
+    }
+    buildPowerAndAudioModules();
+
+    // --- Live TFT Display Texture ---
+    function createTftCanvasTexture() {
+      const c = document.createElement('canvas');
+      c.width = 256;
+      c.height = 320;
+      const g = c.getContext('2d');
+      const tex = new THREE.CanvasTexture(c);
+      tex.minFilter = THREE.LinearFilter;
+      tex.magFilter = THREE.LinearFilter;
+
+      function updateTexture() {
+        g.clearRect(0, 0, 256, 320);
+        if (appState.deepSleep) {
+          g.fillStyle = '#070312';
+          g.fillRect(0, 0, 256, 320);
+          g.strokeStyle = '#6b21a8';
+          g.lineWidth = 4;
+          g.strokeRect(8, 8, 240, 304);
+
+          g.fillStyle = '#c084fc';
+          g.font = 'bold 24px Inter, sans-serif';
+          g.textAlign = 'center';
+          g.fillText('DEEP SLEEP', 128, 128);
+
+          g.fillStyle = '#e9d5ff';
+          g.font = 'bold 21px monospace';
+          g.fillText('SLEEPING (0.01mA)', 128, 168);
+
+          g.fillStyle = '#94a3b8';
+          g.font = '15px Inter, sans-serif';
+          g.fillText('Chạm Nóc 2s để bật lại', 128, 215);
+        } else {
+          const grad = g.createLinearGradient(0, 0, 0, 320);
+          grad.addColorStop(0, '#0f172a');
+          grad.addColorStop(1, '#1e1b4b');
+          g.fillStyle = grad;
+          g.fillRect(0, 0, 256, 320);
+
+          g.fillStyle = '#0284c7';
+          g.fillRect(0, 0, 256, 34);
+          g.fillStyle = '#ffffff';
+          g.font = 'bold 14px Inter, sans-serif';
+          g.textAlign = 'left';
+          g.fillText('LĂNG BÁC • WiFi OK', 12, 22);
+          g.textAlign = 'right';
+          g.fillText('100%', 244, 22);
+
+          g.fillStyle = '#fbbf24';
+          g.font = '800 56px monospace';
+          g.textAlign = 'center';
+          g.fillText('19:48', 128, 114);
+
+          g.fillStyle = '#94a3b8';
+          g.font = '600 15px Inter, sans-serif';
+          g.fillText('Thứ Sáu • 13/11/2026', 128, 144);
+
+          g.fillStyle = 'rgba(15, 23, 42, 0.85)';
+          g.fillRect(18, 166, 220, 74);
+          g.strokeStyle = '#38bdf8';
+          g.lineWidth = 2;
+          g.strokeRect(18, 166, 220, 74);
+
+          g.fillStyle = '#38bdf8';
+          g.font = 'bold 28px monospace';
+          g.fillText('28.5°C', 86, 212);
+
+          g.fillStyle = '#34d399';
+          g.font = 'bold 24px monospace';
+          g.fillText('65%', 194, 211);
+
+          g.fillStyle = appState.ledOn ? 'rgba(245, 158, 11, 0.25)' : 'rgba(51, 65, 85, 0.5)';
+          g.fillRect(18, 256, 220, 44);
+          g.fillStyle = appState.ledOn ? '#fde68a' : '#94a3b8';
+          g.font = 'bold 16px Inter, sans-serif';
+          g.fillText(appState.ledOn ? `ĐÈN NÓC: SÁNG (${appState.brightness}%)` : 'ĐÈN NÓC: ĐANG TẮT', 128, 284);
+        }
+        tex.needsUpdate = true;
+      }
+
+      updateTexture();
+      return { tex, updateTexture };
+    }
+
+    const tftScreenCtrl = createTftCanvasTexture();
+
+    function buildCenterModules() {
+      // 1. ESP32-C3 Super Mini at Columns 2..9 across Center Trench (Rows E & F)
+      // Row E (Cols 2..9): GPIO 5, 6, 7, 8, 9, 10, 20, 21
+      // Row F (Cols 2..9): 5V, GND, 3V3, GPIO 4, GPIO 3, GPIO 2, GPIO 1, GPIO 0
+      const espCenterX = (colX(2) + colX(9)) * 0.5;
+      const espPcb = new THREE.Mesh(
+        new THREE.BoxGeometry(1.18, 0.09, 0.72),
+        new THREE.MeshStandardMaterial({ color: 0x581c87, roughness: 0.4 })
+      );
+      espPcb.position.set(espCenterX, 0.61, BB.cz);
+      rootGroup.add(espPcb);
+
+      const rfShield = new THREE.Mesh(
+        new THREE.BoxGeometry(0.56, 0.11, 0.52),
+        new THREE.MeshStandardMaterial({ color: 0xcbd5e1, metalness: 0.85, roughness: 0.2 })
+      );
+      rfShield.position.set(espCenterX + 0.06, 0.70, BB.cz);
+      rootGroup.add(rfShield);
+
+      const antenna = new THREE.Mesh(
+        new THREE.BoxGeometry(0.20, 0.05, 0.50),
+        new THREE.MeshStandardMaterial({ color: 0xdc2626, roughness: 0.4 })
+      );
+      antenna.position.set(espCenterX + 0.46, 0.67, BB.cz);
+      rootGroup.add(antenna);
+
+      const espUsb = new THREE.Mesh(
+        new THREE.BoxGeometry(0.24, 0.14, 0.34),
+        new THREE.MeshStandardMaterial({ color: 0x94a3b8, metalness: 0.8, roughness: 0.25 })
+      );
+      espUsb.position.set(espCenterX - 0.58, 0.69, BB.cz);
+      rootGroup.add(espUsb);
+
+      const pinGeo = new THREE.CylinderGeometry(0.018, 0.018, 0.18, 8);
+      const pinMat = new THREE.MeshStandardMaterial({ color: 0xfbbf24, metalness: 0.85, roughness: 0.2 });
+      for (let c = 2; c <= 9; c++) {
+        const pE = new THREE.Mesh(pinGeo, pinMat);
+        pE.position.set(colX(c), 0.52, ROW_Z['E']);
+        rootGroup.add(pE);
+
+        const pF = new THREE.Mesh(pinGeo, pinMat);
+        pF.position.set(colX(c), 0.52, ROW_Z['F']);
+        rootGroup.add(pF);
+      }
+
+      registerComponentGroup('lbl_esp', {
+        shortName: 'ESP32-C3',
+        fullName: 'ESP32-C3 Super Mini (Cột 2–9 • Tránh chân strapping 2, 8, 9)',
+        detail: 'Hàng E (2–9): GPIO 5,6,7,8,9,10,20,21 • Hàng F (2–9): 5V,GND,3V3,4,3,2,1,0'
+      }, [espPcb, rfShield, antenna, espUsb]);
+
+      // 2. 1.8" ST7735 TFT Display plugged directly into Row A, Columns 14..21
+      const tftCenterX = (colX(14) + colX(21)) * 0.5;
+      const tftZ = ROW_Z['A'];
+
+      const tftBoard = new THREE.Mesh(
+        new THREE.BoxGeometry(1.36, 1.48, 0.10),
+        new THREE.MeshStandardMaterial({ color: 0xdc2626, roughness: 0.45 })
+      );
+      tftBoard.position.set(tftCenterX, 1.31, tftZ);
+      tftBoard.castShadow = true;
+      rootGroup.add(tftBoard);
+
+      const tftScreen = new THREE.Mesh(
+        new THREE.PlaneGeometry(1.16, 1.28),
+        new THREE.MeshBasicMaterial({ map: tftScreenCtrl.tex })
+      );
+      tftScreen.position.set(tftCenterX, 1.33, tftZ + 0.055);
+      rootGroup.add(tftScreen);
+
+      for (let c = 14; c <= 21; c++) {
+        const pin = new THREE.Mesh(pinGeo, pinMat);
+        pin.position.set(colX(c), 0.53, tftZ);
+        rootGroup.add(pin);
+      }
+
+      registerComponentGroup('lbl_tft', {
+        shortName: 'TFT 1.8"',
+        fullName: 'Màn hình TFT 1.8" SPI ST7735 (Cắm thẳng A14–A21)',
+        detail: 'SCK=GPIO6 (A3), SDA=GPIO7 (A4), RES=GPIO20 (A8), DC=GPIO21 (A9), CS=GPIO1 (J8)'
+      }, [tftBoard, tftScreen]);
+
+      // 3. DHT11 Sensor plugged into Row A, Columns 24..26
+      const dhtCenterX = colX(25);
+      const dhtZ = ROW_Z['A'];
+      const dhtBody = new THREE.Mesh(
+        new THREE.BoxGeometry(0.56, 0.64, 0.28),
+        new THREE.MeshStandardMaterial({ color: 0x0284c7, roughness: 0.45 })
+      );
+      dhtBody.position.set(dhtCenterX, 0.89, dhtZ);
+      rootGroup.add(dhtBody);
+
+      const silverPinMat = new THREE.MeshStandardMaterial({ color: 0xe2e8f0, metalness: 0.85, roughness: 0.2 });
+      for (let c = 24; c <= 26; c++) {
+        const pin = new THREE.Mesh(pinGeo, silverPinMat);
+        pin.position.set(colX(c), 0.53, dhtZ);
+        rootGroup.add(pin);
+      }
+
+      registerComponentGroup('lbl_dht', {
+        shortName: 'DHT11',
+        fullName: 'Cảm biến Nhiệt độ & Độ ẩm DHT11 (Cắm thẳng A24–A26)',
+        detail: 'VCC (B24) → +3.3V, DATA (B25) → GPIO 4 (J5), GND (B26) → GND'
+      }, [dhtBody]);
+    }
+    buildCenterModules();
+
+    // --- Right Zone: XY-MOS MOSFET, Hollow Column, & Architectural 3-Tier Wooden Roof ---
+    let roofHitMeshes = [];
+    let roofLedBulbMeshes = [];
+    let lightConeMesh = null;
+
+    function createWoodPlankTexture() {
+      const c = document.createElement('canvas');
+      c.width = 512;
+      c.height = 512;
+      const g = c.getContext('2d');
+
+      g.fillStyle = '#c27118';
+      g.fillRect(0, 0, 512, 512);
+
+      // Horizontal popsicle-stick wood slats & subtle grain lines
+      for (let y = 0; y < 512; y += 32) {
+        g.fillStyle = (y / 32) % 2 === 0 ? 'rgba(255, 224, 178, 0.14)' : 'rgba(92, 45, 8, 0.14)';
+        g.fillRect(0, y, 512, 30);
+        g.fillStyle = 'rgba(69, 26, 3, 0.55)';
+        g.fillRect(0, y + 30, 512, 2);
+      }
+
+      // Subtle capacitive touch zone ring engraved on top deck
+      g.strokeStyle = 'rgba(254, 243, 199, 0.45)';
+      g.lineWidth = 4;
+      g.beginPath();
+      g.arc(256, 256, 72, 0, Math.PI * 2);
+      g.stroke();
+
+      g.fillStyle = 'rgba(254, 243, 199, 0.72)';
+      g.font = 'bold 20px Inter, sans-serif';
+      g.textAlign = 'center';
+      g.fillText('CHẠM NÓC LĂNG', 256, 262);
+
+      const tex = new THREE.CanvasTexture(c);
+      tex.anisotropy = 4;
+      return tex;
+    }
+
+    function buildRightAndRoofModules() {
+      // 1. XY-MOS MOSFET PWM Module at (4.3, 0.25, 1.5)
+      const mosPcb = new THREE.Mesh(
+        new THREE.BoxGeometry(1.55, 0.12, 1.35),
+        new THREE.MeshStandardMaterial({ color: 0x1d4ed8, roughness: 0.45 })
+      );
+      mosPcb.position.set(4.3, 0.30, 1.5);
+      rootGroup.add(mosPcb);
+
+      const mosChip = new THREE.Mesh(
+        new THREE.BoxGeometry(0.45, 0.12, 0.45),
+        new THREE.MeshStandardMaterial({ color: 0x0f172a })
+      );
+      mosChip.position.set(4.3, 0.41, 1.5);
+      rootGroup.add(mosChip);
+
+      const greenTerm = new THREE.Mesh(
+        new THREE.BoxGeometry(0.32, 0.26, 0.95),
+        new THREE.MeshStandardMaterial({ color: 0x16a34a, roughness: 0.5 })
+      );
+      greenTerm.position.set(4.86, 0.47, 1.5);
+      rootGroup.add(greenTerm);
+
+      const mosLedMat = new THREE.MeshBasicMaterial({ color: 0x22c55e });
+      const mosLed = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.08, 0.12), mosLedMat);
+      mosLed.position.set(3.80, 0.39, 1.08);
+      rootGroup.add(mosLed);
+      window.mosLedMat = mosLedMat;
+
+      registerComponentGroup('lbl_mos', {
+        shortName: 'MOSFET',
+        fullName: 'Module Công Suất MOSFET PWM XY-MOS (5–36V 15A)',
+        detail: 'TRIG ← GPIO 10 (A7) chỉnh sáng PWM • OUT+/OUT- → 2 dây LED Nóc'
+      }, [mosPcb, mosChip, greenTerm]);
+
+      PINS.MOS_TRIG = new THREE.Vector3(3.68, 0.36, 1.12);
+      PINS.MOS_SGND = new THREE.Vector3(3.68, 0.36, 1.42);
+      PINS.MOS_VINP = new THREE.Vector3(4.86, 0.54, 1.82);
+      PINS.MOS_VINM = new THREE.Vector3(4.86, 0.54, 1.60);
+      PINS.MOS_OUTP = new THREE.Vector3(4.86, 0.54, 1.34);
+      PINS.MOS_OUTM = new THREE.Vector3(4.86, 0.54, 1.12);
+
+      // 2. Bounded Hollow Support Column centered at (2.2, 2.45, -0.6), height 4.4 (y = 0.25 to 4.65), radius 0.48
+      const pillarCollarMat = new THREE.MeshStandardMaterial({
+        color: 0xd97706,
+        roughness: 0.45,
+        metalness: 0.15
+      });
+
+      const hollowColumn = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.48, 0.48, 4.4, 36, 1, true),
+        new THREE.MeshStandardMaterial({
+          color: 0xf59e0b,
+          transparent: true,
+          opacity: 0.28,
+          depthWrite: false,
+          side: THREE.DoubleSide,
+          roughness: 0.2
+        })
+      );
+      hollowColumn.position.set(2.2, 2.45, -0.6);
+      hollowColumn.renderOrder = 3;
+      rootGroup.add(hollowColumn);
+
+      const botRing = new THREE.Mesh(new THREE.TorusGeometry(0.48, 0.038, 12, 36), pillarCollarMat);
+      botRing.rotation.x = Math.PI * 0.5;
+      botRing.position.set(2.2, 0.27, -0.6);
+      rootGroup.add(botRing);
+
+      const topRing = new THREE.Mesh(new THREE.TorusGeometry(0.48, 0.038, 12, 36), pillarCollarMat);
+      topRing.rotation.x = Math.PI * 0.5;
+      topRing.position.set(2.2, 4.63, -0.6);
+      rootGroup.add(topRing);
+
+      registerComponentGroup('lbl_pillar', {
+        shortName: 'Cột rỗng',
+        fullName: 'Cột Trụ Rỗng Giấu 5 Sợi Dây Lên Nóc Lăng',
+        detail: 'Đưa 3 dây cảm biến chạm TTP223 + 2 dây LED 5V từ đế lên mái nóc'
+      }, [hollowColumn, botRing, topRing]);
+
+      // 3. Stepped 3-Tier Wooden Mausoleum Roof (y = 4.65 to 5.55, centered at (2.2, 4.95, -0.6))
+      const roofX = 2.2;
+      const roofZ = -0.6;
+      const plankTex = createWoodPlankTexture();
+
+      const woodMat1 = new THREE.MeshStandardMaterial({
+        color: 0xd97706,
+        roughness: 0.55,
+        transparent: true,
+        opacity: 0.90
+      });
+      const woodMat2 = new THREE.MeshStandardMaterial({
+        color: 0xb45309,
+        roughness: 0.50,
+        transparent: true,
+        opacity: 0.94
+      });
+      const woodTopMat = new THREE.MeshStandardMaterial({
+        map: plankTex,
+        roughness: 0.45
+      });
+      const corniceMat = new THREE.MeshStandardMaterial({
+        color: 0x78350f,
+        roughness: 0.45
+      });
+
+      const tier1 = new THREE.Mesh(new THREE.BoxGeometry(4.4, 0.28, 3.3), woodMat1);
+      tier1.position.set(roofX, 4.79, roofZ);
+      tier1.castShadow = true;
+      rootGroup.add(tier1);
+
+      const tier2 = new THREE.Mesh(new THREE.BoxGeometry(3.6, 0.28, 2.65), woodMat2);
+      tier2.position.set(roofX, 5.07, roofZ);
+      rootGroup.add(tier2);
+
+      const tier3 = new THREE.Mesh(new THREE.BoxGeometry(2.8, 0.26, 2.0), woodTopMat);
+      tier3.position.set(roofX, 5.34, roofZ);
+      rootGroup.add(tier3);
+
+      // Architectural top cornice parapet frame on Tier 3 (visible when looking from "Trên Nóc Lăng")
+      const corniceFront = new THREE.Mesh(new THREE.BoxGeometry(2.88, 0.08, 0.10), corniceMat);
+      corniceFront.position.set(roofX, 5.51, roofZ + 0.98);
+      rootGroup.add(corniceFront);
+
+      const corniceBack = new THREE.Mesh(new THREE.BoxGeometry(2.88, 0.08, 0.10), corniceMat);
+      corniceBack.position.set(roofX, 5.51, roofZ - 0.98);
+      rootGroup.add(corniceBack);
+
+      const corniceLeft = new THREE.Mesh(new THREE.BoxGeometry(0.10, 0.08, 2.04), corniceMat);
+      corniceLeft.position.set(roofX - 1.42, 5.51, roofZ);
+      rootGroup.add(corniceLeft);
+
+      const corniceRight = new THREE.Mesh(new THREE.BoxGeometry(0.10, 0.08, 2.04), corniceMat);
+      corniceRight.position.set(roofX + 1.42, 5.51, roofZ);
+      rootGroup.add(corniceRight);
+
+      roofHitMeshes = [tier1, tier2, tier3, corniceFront, corniceBack, corniceLeft, corniceRight];
+      registerComponentGroup('lbl_roof', {
+        shortName: 'Nóc Lăng',
+        fullName: 'Mái Nóc Gỗ Que Kem 3 Tầng (Bấm trực tiếp để thử chạm xuyên gỗ)',
+        detail: 'Chạm xuyên gỗ bật/tắt đèn • Giữ 2 giây vào chế độ Ngủ Sâu (Deep Sleep)'
+      }, roofHitMeshes);
+
+      // 4. Under-Roof Mounted Components (y = 4.62)
+      const foilPatch = new THREE.Mesh(
+        new THREE.BoxGeometry(1.15, 0.02, 1.15),
+        new THREE.MeshStandardMaterial({ color: 0xe2e8f0, metalness: 0.92, roughness: 0.16 })
+      );
+      foilPatch.position.set(1.10, 4.63, -0.40);
+      rootGroup.add(foilPatch);
+
+      registerComponentGroup('lbl_foil', {
+        shortName: 'Giấy bạc',
+        fullName: 'Miếng Giấy Bạc Tăng Nhạy (3×3cm) Dán Dưới Nóc',
+        detail: 'Mở rộng vùng cảm ứng điện dung để chạm đâu trên nóc cũng nhận'
+      }, [foilPatch]);
+
+      const ttpBoard = new THREE.Mesh(
+        new THREE.BoxGeometry(0.76, 0.08, 0.68),
+        new THREE.MeshStandardMaterial({ color: 0xdc2626, roughness: 0.45 })
+      );
+      ttpBoard.position.set(2.20, 4.60, 0.18);
+      rootGroup.add(ttpBoard);
+
+      const foilLink = new THREE.Mesh(
+        new THREE.BoxGeometry(0.45, 0.02, 0.04),
+        new THREE.MeshStandardMaterial({ color: 0xfbbf24, metalness: 0.85, roughness: 0.2 })
+      );
+      foilLink.position.set(1.70, 4.615, 0.02);
+      foilLink.rotation.y = -0.35;
+      rootGroup.add(foilLink);
+
+      registerComponentGroup('lbl_ttp', {
+        shortName: 'TTP223',
+        fullName: 'Cảm Biến Chạm Điện Dung TTP223 (Hàn phẳng dưới nóc)',
+        detail: 'Bắt xuyên gỗ 2–4mm • VCC (+3.3V), I/O (GPIO 3 ở J6), GND'
+      }, [ttpBoard, foilLink]);
+
+      PINS.ROOF_TTP_VCC = new THREE.Vector3(2.48, 4.58, -0.02);
+      PINS.ROOF_TTP_IO  = new THREE.Vector3(2.48, 4.58,  0.18);
+      PINS.ROOF_TTP_GND = new THREE.Vector3(2.48, 4.58,  0.38);
+
+      const ledStripBase = new THREE.Mesh(
+        new THREE.BoxGeometry(2.35, 0.06, 0.42),
+        new THREE.MeshStandardMaterial({ color: 0xf8fafc, roughness: 0.4 })
+      );
+      ledStripBase.position.set(1.90, 4.61, -1.28);
+      rootGroup.add(ledStripBase);
+
+      roofLedBulbMeshes = [];
+      for (let i = 0; i < 6; i++) {
+        const bulb = new THREE.Mesh(
+          new THREE.BoxGeometry(0.18, 0.06, 0.18),
+          new THREE.MeshStandardMaterial({
+            color: 0xfef08a,
+            emissive: 0xf59e0b,
+            emissiveIntensity: 1.4
+          })
+        );
+        bulb.position.set(1.00 + i * 0.36, 4.56, -1.28);
+        rootGroup.add(bulb);
+        roofLedBulbMeshes.push(bulb);
+      }
+
+      registerComponentGroup('lbl_led', {
+        shortName: 'LED 5V',
+        fullName: 'Dây Đèn LED 5V Vàng Ấm (Dán úp mặt dưới nóc)',
+        detail: 'Hắt ánh sáng vàng dịu xuống hàng cột • Nối OUT+/OUT- của MOSFET'
+      }, [ledStripBase, ...roofLedBulbMeshes]);
+
+      PINS.ROOF_LED_PLUS = new THREE.Vector3(2.92, 4.58, -1.38);
+      PINS.ROOF_LED_NEG  = new THREE.Vector3(2.92, 4.58, -1.18);
+
+      const coneGeo = new THREE.CylinderGeometry(1.15, 2.35, 4.15, 32, 1, true);
+      const coneMat = new THREE.MeshBasicMaterial({
+        color: 0xfbbf24,
+        transparent: true,
+        opacity: 0.14,
+        depthWrite: false,
+        side: THREE.DoubleSide
+      });
+      lightConeMesh = new THREE.Mesh(coneGeo, coneMat);
+      lightConeMesh.position.set(1.90, 2.48, -1.28);
+      lightConeMesh.renderOrder = 2;
+      rootGroup.add(lightConeMesh);
+    }
+    buildRightAndRoofModules();
+
+    // =========================================================================
+    // 6. VERIFIED 31-WIRE DATA (ESP32-C3 COLS 2..9, ZERO STRAPPING PINS)
+    // =========================================================================
+    function columnRoutePoints(dx, dz) {
+      return [
+        new THREE.Vector3(2.2 + dx, 0.35, -0.6 + dz),
+        new THREE.Vector3(2.2 + dx, 2.45, -0.6 + dz),
+        new THREE.Vector3(2.2 + dx, 4.55, -0.6 + dz)
+      ];
+    }
+
+    const WIRES_DATA = [
+      // B1: NGUỒN PIN 18650 & BO SẠC XẢ 5V 2A (5 DÂY)
+      {
+        id: 'w01', group: 'B1', isRoof: false, color: 0xef4444, hex: '#ef4444',
+        name: 'Đế Pin 18650 (+) → Bo Sạc Xả (B+)',
+        from: PINS.BAT_PLUS, to: PINS.CHG_B_PLUS, arc: 0.25, endA: 'sold', endB: 'sold',
+        fromDesc: '[Dây Đỏ Đế Pin] Cực Dương +3.7V',
+        toDesc: '[Đầu đồng trần hàn] Bo Sạc Xả 5V 2A (Lỗ B+)',
+        note: 'Hàn dây đỏ của khay pin 18650 trực tiếp vào lỗ B+ trên bo sạc xả.'
+      },
+      {
+        id: 'w02', group: 'B1', isRoof: false, color: 0x334155, hex: '#475569',
+        name: 'Đế Pin 18650 (−) → Bo Sạc Xả (B-)',
+        from: PINS.BAT_MINUS, to: PINS.CHG_B_MINUS, arc: 0.22, endA: 'sold', endB: 'sold',
+        fromDesc: '[Dây Đen Đế Pin] Cực Âm GND',
+        toDesc: '[Đầu đồng trần hàn] Bo Sạc Xả 5V 2A (Lỗ B-)',
+        note: 'Hàn dây đen của khay pin 18650 trực tiếp vào lỗ B- trên bo sạc xả.'
+      },
+      {
+        id: 'w03', group: 'B1', isRoof: false, color: 0xef4444, hex: '#ef4444',
+        name: 'Bo Sạc Xả (OUT+ 5V) → Thanh Đỏ Sau (+5V)',
+        from: PINS.CHG_OUT_PLUS, to: bbHole('TOP+', 1), arc: 0.35, endA: 'sold', endB: 'M',
+        fromDesc: '[Đầu đồng trần hàn] Bo Sạc Xả 5V 2A (Lỗ OUT+)',
+        toDesc: '[Đầu Đực] Breadboard Thanh Đỏ SAU (+5V, Cột 1)',
+        note: 'Cắt đôi 1 sợi Đực-Đực: hàn đầu đồng trần vào OUT+, cắm đầu Đực vào Thanh Đỏ SAU (+5V).'
+      },
+      {
+        id: 'w04', group: 'B1', isRoof: false, color: 0x2563eb, hex: '#3b82f6',
+        name: 'Bo Sạc Xả (OUT- GND) → Thanh Xanh Sau (GND)',
+        from: PINS.CHG_OUT_MINUS, to: bbHole('TOP-', 1), arc: 0.38, endA: 'sold', endB: 'M',
+        fromDesc: '[Đầu đồng trần hàn] Bo Sạc Xả 5V 2A (Lỗ OUT-)',
+        toDesc: '[Đầu Đực] Breadboard Thanh Xanh SAU (GND, Cột 1)',
+        note: 'Nửa sợi Đực-Đực còn lại: hàn đầu đồng trần vào OUT-, cắm đầu Đực vào Thanh Xanh SAU.'
+      },
+      {
+        id: 'w05', group: 'B1', isRoof: false, color: 0x2563eb, hex: '#3b82f6',
+        name: 'Nối thông GND Sau → GND Trước',
+        from: bbHole('TOP-', 2), to: bbHole('BOT-', 2), arc: 0.42, endA: 'M', endB: 'M',
+        fromDesc: '[Đầu Đực] Thanh Xanh SAU (GND, Cột 2)',
+        toDesc: '[Đầu Đực] Thanh Xanh TRƯỚC (GND, Cột 2)',
+        note: 'Dùng nguyên 1 sợi Đực-Đực nối thông Mass GND giữa 2 thanh nguồn Breadboard.'
+      },
+
+      // B2: CẤP NGUỒN ESP32-C3 SUPER MINI CỘT 2..9 (3 DÂY)
+      {
+        id: 'w06', group: 'B2', isRoof: false, color: 0xef4444, hex: '#ef4444',
+        name: 'Cấp nguồn +5V cho ESP32-C3 (J2)',
+        from: bbHole('TOP+', 2), to: bbHole('J', 2), arc: 0.48, endA: 'M', endB: 'M',
+        fromDesc: '[Đầu Đực] Thanh Đỏ SAU (+5V, Cột 2)',
+        toDesc: '[Đầu Đực] Lỗ J2 (Cùng cột chân 5V ESP32-C3 ở F2)',
+        note: 'Dùng dây Đực-Đực cấp +5V ổn định vào chân 5V (F2) của ESP32-C3.'
+      },
+      {
+        id: 'w07', group: 'B2', isRoof: false, color: 0x2563eb, hex: '#3b82f6',
+        name: 'Nối Mass GND cho ESP32-C3 (J3)',
+        from: bbHole('BOT-', 3), to: bbHole('J', 3), arc: 0.25, endA: 'M', endB: 'M',
+        fromDesc: '[Đầu Đực] Thanh Xanh TRƯỚC (GND, Cột 3)',
+        toDesc: '[Đầu Đực] Lỗ J3 (Cùng cột chân GND ESP32-C3 ở F3)',
+        note: 'Dùng dây Đực-Đực nối chân GND (F3) của ESP32-C3 xuống thanh Mass.'
+      },
+      {
+        id: 'w08', group: 'B2', isRoof: false, color: 0xf97316, hex: '#f97316',
+        name: 'Xuất nguồn +3.3V ra Thanh Đỏ Trước (J4)',
+        from: bbHole('J', 4), to: bbHole('BOT+', 4), arc: 0.25, endA: 'M', endB: 'M',
+        fromDesc: '[Đầu Đực] Lỗ J4 (Cùng cột chân 3V3 ESP32-C3 ở F4)',
+        toDesc: '[Đầu Đực] Thanh Đỏ TRƯỚC (+3.3V, Cột 4)',
+        note: 'Lấy điện áp 3.3V sạch từ chân 3V3 (F4) nuôi màn hình TFT, DHT11 và TTP223.'
+      },
+
+      // B3: MÀN HÌNH TFT 1.8" ST7735 CẮM THẲNG A14–A21 (8 DÂY)
+      {
+        id: 'w09', group: 'B3', isRoof: false, color: 0x2563eb, hex: '#3b82f6',
+        name: 'TFT Chân 1 (GND): B14 → Thanh Xanh Trước',
+        from: bbHole('B', 14), to: bbHole('BOT-', 14), arc: 0.52, endA: 'M', endB: 'M',
+        fromDesc: '[Đầu Đực] Lỗ B14 (Chân GND TFT cắm ở A14)',
+        toDesc: '[Đầu Đực] Thanh Xanh TRƯỚC (GND, Cột 14)',
+        note: 'TFT cắm thẳng hàng A14–A21, nối dây Đực-Đực từ B14 xuống thanh GND.'
+      },
+      {
+        id: 'w10', group: 'B3', isRoof: false, color: 0xf97316, hex: '#f97316',
+        name: 'TFT Chân 2 (VCC): B15 → Thanh Đỏ Trước (+3.3V)',
+        from: bbHole('B', 15), to: bbHole('BOT+', 15), arc: 0.48, endA: 'M', endB: 'M',
+        fromDesc: '[Đầu Đực] Lỗ B15 (Chân VCC TFT cắm ở A15)',
+        toDesc: '[Đầu Đực] Thanh Đỏ TRƯỚC (+3.3V, Cột 15)',
+        note: 'Cấp nguồn 3.3V từ thanh nguồn trước vào lỗ B15 cho màn hình TFT.'
+      },
+      {
+        id: 'w11', group: 'B3', isRoof: false, color: 0xf8fafc, hex: '#f8fafc',
+        name: 'TFT Chân 3 (SCK/SCL): B16 → GPIO 6 (A3)',
+        from: bbHole('B', 16), to: bbHole('A', 3), arc: 0.45, endA: 'M', endB: 'M',
+        fromDesc: '[Đầu Đực] Lỗ B16 (Chân SCK TFT cắm ở A16)',
+        toDesc: '[Đầu Đực] Lỗ A3 (Chân GPIO 6 ESP32-C3 ở E3)',
+        note: 'Truyền xung nhịp SPI SCK từ chân an toàn GPIO 6 sang màn hình TFT.'
+      },
+      {
+        id: 'w12', group: 'B3', isRoof: false, color: 0x38bdf8, hex: '#38bdf8',
+        name: 'TFT Chân 4 (SDA/MOSI): B17 → GPIO 7 (A4)',
+        from: bbHole('B', 17), to: bbHole('A', 4), arc: 0.50, endA: 'M', endB: 'M',
+        fromDesc: '[Đầu Đực] Lỗ B17 (Chân SDA TFT cắm ở A17)',
+        toDesc: '[Đầu Đực] Lỗ A4 (Chân GPIO 7 ESP32-C3 ở E4)',
+        note: 'Truyền dữ liệu hình ảnh SPI MOSI từ chân an toàn GPIO 7 sang TFT.'
+      },
+      {
+        id: 'w13', group: 'B3', isRoof: false, color: 0xa855f7, hex: '#a855f7',
+        name: 'TFT Chân 5 (RES/RST): B18 → GPIO 20 (A8)',
+        from: bbHole('B', 18), to: bbHole('A', 8), arc: 0.55, endA: 'M', endB: 'M',
+        fromDesc: '[Đầu Đực] Lỗ B18 (Chân RES TFT cắm ở A18)',
+        toDesc: '[Đầu Đực] Lỗ A8 (Chân GPIO 20 ESP32-C3 ở E8)',
+        note: 'Chân khởi động lại màn hình TFT nối về chân GPIO 20 (tránh chân strapping 8, 9).'
+      },
+      {
+        id: 'w14', group: 'B3', isRoof: false, color: 0xeab308, hex: '#eab308',
+        name: 'TFT Chân 6 (DC/A0): B19 → GPIO 21 (A9)',
+        from: bbHole('B', 19), to: bbHole('A', 9), arc: 0.60, endA: 'M', endB: 'M',
+        fromDesc: '[Đầu Đực] Lỗ B19 (Chân DC TFT cắm ở A19)',
+        toDesc: '[Đầu Đực] Lỗ A9 (Chân GPIO 21 ESP32-C3 ở E9)',
+        note: 'Chân chọn lệnh/dữ liệu DC nối sang chân GPIO 21.'
+      },
+      {
+        id: 'w15', group: 'B3', isRoof: false, color: 0x22c55e, hex: '#22c55e',
+        name: 'TFT Chân 7 (CS): B20 → GPIO 1 (J8)',
+        from: bbHole('B', 20), to: bbHole('J', 8), arc: 0.65, endA: 'M', endB: 'M',
+        fromDesc: '[Đầu Đực] Lỗ B20 (Chân CS TFT cắm ở A20)',
+        toDesc: '[Đầu Đực] Lỗ J8 (Chân GPIO 1 ESP32-C3 ở F8)',
+        note: 'Chân chọn chip SPI CS nối sang chân an toàn GPIO 1.'
+      },
+      {
+        id: 'w16', group: 'B3', isRoof: false, color: 0xf97316, hex: '#f97316',
+        name: 'TFT Chân 8 (BL Đèn nền): B21 → +3.3V',
+        from: bbHole('B', 21), to: bbHole('BOT+', 21), arc: 0.56, endA: 'M', endB: 'M',
+        fromDesc: '[Đầu Đực] Lỗ B21 (Chân BL TFT cắm ở A21)',
+        toDesc: '[Đầu Đực] Thanh Đỏ TRƯỚC (+3.3V, Cột 21)',
+        note: 'Cấp nguồn 3.3V cho đèn nền màn hình TFT sáng rõ.'
+      },
+
+      // B4: CẢM BIẾN DHT11 (A24–A26) & TTP223 DƯỚI NÓC (6 DÂY)
+      {
+        id: 'w17', group: 'B4', isRoof: false, color: 0xf97316, hex: '#f97316',
+        name: 'DHT11 (VCC): B24 → Thanh Đỏ Trước (+3.3V)',
+        from: bbHole('B', 24), to: bbHole('BOT+', 24), arc: 0.48, endA: 'M', endB: 'M',
+        fromDesc: '[Đầu Đực] Lỗ B24 (Chân VCC DHT11 ở A24)',
+        toDesc: '[Đầu Đực] Thanh Đỏ TRƯỚC (+3.3V, Cột 24)',
+        note: 'Cấp nguồn 3.3V cho cảm biến nhiệt độ độ ẩm DHT11.'
+      },
+      {
+        id: 'w18', group: 'B4', isRoof: false, color: 0x2dd4bf, hex: '#2dd4bf',
+        name: 'DHT11 (DATA): B25 → GPIO 4 (J5)',
+        from: bbHole('B', 25), to: bbHole('J', 5), arc: 0.58, endA: 'M', endB: 'M',
+        fromDesc: '[Đầu Đực] Lỗ B25 (Chân DATA DHT11 ở A25)',
+        toDesc: '[Đầu Đực] Lỗ J5 (Chân GPIO 4 ESP32-C3 ở F5)',
+        note: 'Đọc dữ liệu nhiệt độ & độ ẩm từ DHT11 về chân GPIO 4.'
+      },
+      {
+        id: 'w19', group: 'B4', isRoof: false, color: 0x2563eb, hex: '#3b82f6',
+        name: 'DHT11 (GND): B26 → Thanh Xanh Trước (GND)',
+        from: bbHole('B', 26), to: bbHole('BOT-', 26), arc: 0.52, endA: 'M', endB: 'M',
+        fromDesc: '[Đầu Đực] Lỗ B26 (Chân GND DHT11 ở A26)',
+        toDesc: '[Đầu Đực] Thanh Xanh TRƯỚC (GND, Cột 26)',
+        note: 'Nối Mass GND cho DHT11.'
+      },
+      {
+        id: 'w20', group: 'B4', isRoof: true, color: 0xf97316, hex: '#f97316',
+        name: '🏛️ [Nóc 1/5] TTP223 dưới Nóc (VCC) ← +3.3V',
+        from: bbHole('BOT+', 28), to: PINS.ROOF_TTP_VCC, endA: 'M', endB: 'sold',
+        waypoints: columnRoutePoints(-0.16, 0.14),
+        fromDesc: '[Đầu Đực] Thanh Đỏ TRƯỚC (+3.3V, Cột 28)',
+        toDesc: '[Đầu đồng trần hàn] TTP223 dưới Nóc (Lỗ VCC)',
+        note: 'Sợi 1/5 luồn cột rỗng: cấp nguồn 3.3V liên tục nuôi TTP223 để chạm xuyên gỗ bất cứ lúc nào.'
+      },
+      {
+        id: 'w21', group: 'B4', isRoof: true, color: 0xf472b6, hex: '#f472b6',
+        name: '🏛️ [Nóc 2/5] TTP223 dưới Nóc (I/O) → GPIO 3 (J6)',
+        from: bbHole('J', 6), to: PINS.ROOF_TTP_IO, endA: 'M', endB: 'sold',
+        waypoints: columnRoutePoints(0.0, 0.18),
+        fromDesc: '[Đầu Đực] Lỗ J6 (Chân GPIO 3 ESP32-C3 ở F6)',
+        toDesc: '[Đầu đồng trần hàn] TTP223 dưới Nóc (Lỗ I/O)',
+        note: 'Sợi 2/5 luồn cột rỗng: truyền tín hiệu chạm xuyên gỗ về chân đánh thức Deep Sleep GPIO 3.'
+      },
+      {
+        id: 'w22', group: 'B4', isRoof: true, color: 0x2563eb, hex: '#3b82f6',
+        name: '🏛️ [Nóc 3/5] TTP223 dưới Nóc (GND) ← GND',
+        from: bbHole('BOT-', 29), to: PINS.ROOF_TTP_GND, endA: 'M', endB: 'sold',
+        waypoints: columnRoutePoints(0.16, 0.14),
+        fromDesc: '[Đầu Đực] Thanh Xanh TRƯỚC (GND, Cột 29)',
+        toDesc: '[Đầu đồng trần hàn] TTP223 dưới Nóc (Lỗ GND)',
+        note: 'Sợi 3/5 luồn cột rỗng: nối Mass chung cho cảm biến chạm TTP223 dưới nóc.'
+      },
+
+      // B5: MOSFET PWM XY-MOS, 2 DÂY LED NÓC & LOA BLUETOOTH MH-M38 (9 DÂY)
+      {
+        id: 'w23', group: 'B5', isRoof: false, color: 0xeab308, hex: '#eab308',
+        name: 'MOSFET PWM (TRIG) ← GPIO 10 (A7)',
+        from: bbHole('A', 7), to: PINS.MOS_TRIG, arc: 0.68, endA: 'M', endB: 'sold',
+        fromDesc: '[Đầu Đực] Lỗ A7 (Chân GPIO 10 ESP32-C3 ở E7)',
+        toDesc: '[Đầu đồng trần hàn] XY-MOS MOSFET (Chân TRIG)',
+        note: 'Xuất xung PWM từ chân an toàn GPIO 10 điều khiển độ sáng mượt mà cho đèn LED trên nóc.'
+      },
+      {
+        id: 'w24', group: 'B5', isRoof: false, color: 0x2563eb, hex: '#3b82f6',
+        name: 'MOSFET PWM (GND tín hiệu) ← Thanh Xanh Sau',
+        from: bbHole('TOP-', 25), to: PINS.MOS_SGND, arc: 0.42, endA: 'M', endB: 'sold',
+        fromDesc: '[Đầu Đực] Thanh Xanh SAU (GND, Cột 25)',
+        toDesc: '[Đầu đồng trần hàn] XY-MOS MOSFET (Chân GND)',
+        note: 'Nối Mass tham chiếu tín hiệu PWM cho module MOSFET.'
+      },
+      {
+        id: 'w25', group: 'B5', isRoof: false, color: 0xef4444, hex: '#ef4444',
+        name: 'MOSFET PWM (VIN+) ← Thanh Đỏ Sau (+5V)',
+        from: bbHole('TOP+', 27), to: PINS.MOS_VINP, arc: 0.46, endA: 'M', endB: 'sold',
+        fromDesc: '[Đầu Đực] Thanh Đỏ SAU (+5V, Cột 27)',
+        toDesc: '[Đầu đồng trần vặn ốc] XY-MOS MOSFET (Cổng VIN+)',
+        note: 'Cấp nguồn công suất +5V vào cổng VIN+ của MOSFET.'
+      },
+      {
+        id: 'w26', group: 'B5', isRoof: false, color: 0x2563eb, hex: '#3b82f6',
+        name: 'MOSFET PWM (VIN-) ← Thanh Xanh Sau (GND)',
+        from: bbHole('TOP-', 27), to: PINS.MOS_VINM, arc: 0.50, endA: 'M', endB: 'sold',
+        fromDesc: '[Đầu Đực] Thanh Xanh SAU (GND, Cột 27)',
+        toDesc: '[Đầu đồng trần vặn ốc] XY-MOS MOSFET (Cổng VIN-)',
+        note: 'Cấp Mass nguồn vào cổng VIN- của MOSFET.'
+      },
+      {
+        id: 'w27', group: 'B5', isRoof: true, color: 0xef4444, hex: '#ef4444',
+        name: '🏛️ [Nóc 4/5] Dây LED 5V Vàng (+5V) ← MOSFET (OUT+)',
+        from: PINS.MOS_OUTP, to: PINS.ROOF_LED_PLUS, endA: 'sold', endB: 'sold',
+        waypoints: columnRoutePoints(-0.13, -0.16),
+        fromDesc: '[Đầu đồng trần vặn ốc] XY-MOS MOSFET (Cổng OUT+)',
+        toDesc: '[Đầu đồng trần hàn] Dây LED 5V Vàng dưới Nóc (+5V)',
+        note: 'Sợi 4/5 luồn cột rỗng: dẫn nguồn +5V từ OUT+ của MOSFET lên cực dương dải LED trên nóc.'
+      },
+      {
+        id: 'w28', group: 'B5', isRoof: true, color: 0xfacc15, hex: '#facc15',
+        name: '🏛️ [Nóc 5/5] Dây LED 5V Vàng (LED-) ← MOSFET (OUT-)',
+        from: PINS.MOS_OUTM, to: PINS.ROOF_LED_NEG, endA: 'sold', endB: 'sold',
+        waypoints: columnRoutePoints(0.13, -0.16),
+        fromDesc: '[Đầu đồng trần vặn ốc] XY-MOS MOSFET (Cổng OUT-)',
+        toDesc: '[Đầu đồng trần hàn] Dây LED 5V Vàng dưới Nóc (LED-)',
+        note: 'Sợi 5/5 luồn cột rỗng: dẫn cực âm đóng ngắt PWM từ OUT- của MOSFET lên dải LED vàng.'
+      },
+      {
+        id: 'w29', group: 'B5', isRoof: false, color: 0xef4444, hex: '#ef4444',
+        name: 'Bluetooth MH-M38 (5V) ← Thanh Đỏ Sau (+5V)',
+        from: bbHole('TOP+', 6), to: PINS.BT_5V, arc: 0.55, endA: 'M', endB: 'sold',
+        fromDesc: '[Đầu Đực] Thanh Đỏ SAU (+5V, Cột 6)',
+        toDesc: '[Đầu đồng trần hàn] Bluetooth MH-M38 (Lỗ 5V)',
+        note: 'Cấp nguồn 5V nuôi mạch thu âm thanh Bluetooth MH-M38.'
+      },
+      {
+        id: 'w30', group: 'B5', isRoof: false, color: 0x2563eb, hex: '#3b82f6',
+        name: 'Bluetooth MH-M38 (GND) ← Thanh Xanh Trước',
+        from: bbHole('BOT-', 6), to: PINS.BT_GND, arc: 0.34, endA: 'M', endB: 'sold',
+        fromDesc: '[Đầu Đực] Thanh Xanh TRƯỚC (GND, Cột 6)',
+        toDesc: '[Đầu đồng trần hàn] Bluetooth MH-M38 (Lỗ GND)',
+        note: 'Nối Mass GND cho mạch Bluetooth MH-M38.'
+      },
+      {
+        id: 'w31', group: 'B5', isRoof: false, color: 0x38bdf8, hex: '#38bdf8',
+        name: 'Cáp Loa 4R 3W (L+ / L-) ↔ Mạch MH-M38',
+        from: PINS.BT_LP, to: PINS.SPK_TERMINAL, arc: 0.28, endA: 'sold', endB: 'sold',
+        fromDesc: '[Giắc 2 dây đi kèm] Cổng L+ / L- trên MH-M38',
+        toDesc: '[Hàn trực tiếp] 2 cực của củ Loa tròn 4R 3W 40mm',
+        note: 'Dùng cặp dây giắc đi kèm gói MH-M38 hàn thẳng vào 2 cực loa (cách ly hoàn toàn với GND).'
+      }
+    ];
+
+    const wireObjects = [];
+    const wirePickMeshes = [];
+
+    const dupontBootMat = new THREE.MeshStandardMaterial({ color: 0x0f172a, roughness: 0.5 });
+    const solderBlobMat = new THREE.MeshStandardMaterial({ color: 0xfbbf24, metalness: 0.85, roughness: 0.2 });
+
+    WIRES_DATA.forEach(w => {
+      const pts = [w.from.clone()];
+      if (w.waypoints && w.waypoints.length > 0) {
+        w.waypoints.forEach(wp => pts.push(wp.clone()));
+      } else {
+        const mid = w.from.clone().lerp(w.to, 0.5);
+        mid.y = Math.max(w.from.y, w.to.y) + (w.arc || 0.35);
+        pts.push(mid);
+      }
+      pts.push(w.to.clone());
+
+      const curve = new THREE.CatmullRomCurve3(pts, false, 'catmullrom', 0.35);
+      const tubularSegments = w.isRoof ? 64 : 28;
+      const tubeGeo = new THREE.TubeGeometry(curve, tubularSegments, 0.022, 8, false);
+      const tubeMat = new THREE.MeshStandardMaterial({
+        color: w.color,
+        roughness: 0.35,
+        metalness: 0.1,
+        emissive: 0x000000,
+        emissiveIntensity: 0,
+        transparent: true,
+        opacity: 1.0
+      });
+
+      const mesh = new THREE.Mesh(tubeGeo, tubeMat);
+      mesh.userData = { wireId: w.id };
+      rootGroup.add(mesh);
+      wirePickMeshes.push(mesh);
+
+      const makeEndpointVisual = (pos, endType, isRoofTop) => {
+        if (endType === 'M') {
+          const boot = new THREE.Mesh(new THREE.BoxGeometry(0.065, 0.13, 0.065), dupontBootMat);
+          boot.position.set(pos.x, pos.y + 0.065, pos.z);
+          rootGroup.add(boot);
+        } else {
+          const blob = new THREE.Mesh(new THREE.SphereGeometry(0.042, 10, 8), solderBlobMat);
+          blob.position.set(pos.x, pos.y + (isRoofTop ? -0.01 : 0.01), pos.z);
+          rootGroup.add(blob);
+        }
+
+        const ring = new THREE.Mesh(
+          new THREE.RingGeometry(0.08, 0.14, 24),
+          new THREE.MeshBasicMaterial({ color: 0xfbbf24, side: THREE.DoubleSide, transparent: true, opacity: 0.95 })
+        );
+        ring.rotation.x = -Math.PI * 0.5;
+        ring.position.set(pos.x, pos.y + (isRoofTop ? -0.02 : 0.03), pos.z);
+        ring.visible = false;
+        rootGroup.add(ring);
+        return ring;
+      };
+
+      const ringA = makeEndpointVisual(w.from, w.endA, false);
+      const ringB = makeEndpointVisual(w.to, w.endB, w.isRoof);
+
+      wireObjects.push({ data: w, mesh, mat: tubeMat, ringA, ringB });
+    });
+
+    // =========================================================================
+    // 7. TINY COMPACT 10px 3D LABELS + 2D BOUNDING-BOX COLLISION AVOIDANCE
+    // =========================================================================
+    const labelsOverlay = document.getElementById('labelsOverlay');
+    const leaderSvg = document.getElementById('leaderSvg');
+
+    const LABEL_ANCHORS = [
+      { id: 'lbl_roof',   text: 'Nóc Lăng',  pos: new THREE.Vector3(2.20, 5.55, -0.60), offsetX:   0, offsetY: -22, border: '#f59e0b', color: '#fde68a' },
+      { id: 'lbl_led',    text: 'LED 5V',    pos: new THREE.Vector3(1.90, 4.58, -1.28), offsetX: -52, offsetY: -24, border: '#facc15', color: '#fef08a' },
+      { id: 'lbl_foil',   text: 'Giấy bạc',  pos: new THREE.Vector3(1.10, 4.63, -0.40), offsetX: -56, offsetY:  -4, border: '#94a3b8', color: '#f1f5f9' },
+      { id: 'lbl_ttp',    text: 'TTP223',    pos: new THREE.Vector3(2.20, 4.58,  0.18), offsetX: -46, offsetY:  20, border: '#f87171', color: '#fecaca' },
+      { id: 'lbl_pillar', text: 'Cột rỗng',  pos: new THREE.Vector3(2.20, 2.55, -0.60), offsetX:  50, offsetY:   0, border: '#f59e0b', color: '#fde68a' },
+      { id: 'lbl_bat',    text: 'Pin 18650', pos: new THREE.Vector3(-4.80, 0.90, -1.20), offsetX: -10, offsetY: -18, border: '#10b981', color: '#a7f3d0' },
+      { id: 'lbl_chg',    text: 'Sạc Xả 5V', pos: new THREE.Vector3(-4.60, 0.54,  0.70), offsetX: -18, offsetY: -16, border: '#34d399', color: '#6ee7b7' },
+      { id: 'lbl_bt',     text: 'MH-M38',    pos: new THREE.Vector3(-4.60, 0.44,  2.30), offsetX: -18, offsetY:  18, border: '#38bdf8', color: '#bae6fd' },
+      { id: 'lbl_spk',    text: 'Loa 3W',    pos: new THREE.Vector3(-2.50, 0.72,  2.70), offsetX:   0, offsetY:  20, border: '#94a3b8', color: '#e2e8f0' },
+      { id: 'lbl_esp',    text: 'ESP32-C3',  pos: new THREE.Vector3(-1.25, 0.78,  0.60), offsetX: -10, offsetY: -24, border: '#a855f7', color: '#e9d5ff' },
+      { id: 'lbl_tft',    text: 'TFT 1.8"',  pos: new THREE.Vector3( 0.52, 2.06, -0.28), offsetX:   0, offsetY: -18, border: '#ef4444', color: '#fecaca' },
+      { id: 'lbl_dht',    text: 'DHT11',     pos: new THREE.Vector3( 1.65, 1.22, -0.28), offsetX:  26, offsetY: -18, border: '#38bdf8', color: '#bae6fd' },
+      { id: 'lbl_mos',    text: 'MOSFET',    pos: new THREE.Vector3( 4.30, 0.60,  1.50), offsetX:  22, offsetY:  20, border: '#3b82f6', color: '#bfdbfe' }
+    ];
+
+    LABEL_ANCHORS.forEach(item => {
+      const el = document.createElement('div');
+      el.className = 'label-3d';
+      el.textContent = item.text;
+      el.style.color = item.color;
+      el.style.borderColor = item.border;
+      labelsOverlay.appendChild(el);
+      item.el = el;
+    });
+
+    function updateLabelsOverlay(w, h) {
+      if (appState.labelMode === 'hidden') {
+        labelsOverlay.style.display = 'none';
+        leaderSvg.style.display = 'none';
+        return;
+      }
+      labelsOverlay.style.display = 'block';
+      leaderSvg.style.display = 'block';
+
+      const projected = [];
+      LABEL_ANCHORS.forEach(item => {
+        const showThis =
+          appState.labelMode === 'compact' ||
+          (appState.labelMode === 'hover' && appState.hoveredComponentId === item.id);
+
+        if (!showThis) {
+          item.el.style.display = 'none';
+          return;
+        }
+
+        const v = item.pos.clone().project(camera);
+        if (v.z > 1) {
+          item.el.style.display = 'none';
+          return;
+        }
+
+        const ax = (v.x * 0.5 + 0.5) * w;
+        const ay = (-v.y * 0.5 + 0.5) * h;
+        const lx = Math.max(46, Math.min(w - 46, ax + item.offsetX));
+        const ly = Math.max(40, Math.min(h - 18, ay + item.offsetY));
+        const estW = item.text.length * 5.4 + 12;
+        const estH = 18;
+
+        projected.push({ item, ax, ay, x: lx, y: ly, w: estW, h: estH });
+      });
+
+      for (let pass = 0; pass < 4; pass++) {
+        for (let i = 0; i < projected.length; i++) {
+          for (let j = i + 1; j < projected.length; j++) {
+            const a = projected[i];
+            const b = projected[j];
+            const overlapX = (a.w + b.w) * 0.5 + 3 - Math.abs(a.x - b.x);
+            const overlapY = (a.h + b.h) * 0.5 + 2 - Math.abs(a.y - b.y);
+            if (overlapX > 0 && overlapY > 0) {
+              const pushY = overlapY * 0.55;
+              if (a.y <= b.y) {
+                a.y = Math.max(38, a.y - pushY);
+                b.y = Math.min(h - 16, b.y + pushY);
+              } else {
+                a.y = Math.min(h - 16, a.y + pushY);
+                b.y = Math.max(38, b.y - pushY);
+              }
+            }
+          }
+        }
+      }
+
+      let svgMarkup = '';
+      projected.forEach(p => {
+        p.item.el.style.display = 'block';
+        p.item.el.style.left = `${p.x.toFixed(1)}px`;
+        p.item.el.style.top = `${p.y.toFixed(1)}px`;
+
+        svgMarkup += `
+          <line x1="${p.ax.toFixed(1)}" y1="${p.ay.toFixed(1)}"
+                x2="${p.x.toFixed(1)}" y2="${p.y.toFixed(1)}"
+                stroke="${p.item.border}" stroke-width="1" stroke-opacity="0.65" />
+          <circle cx="${p.ax.toFixed(1)}" cy="${p.ay.toFixed(1)}" r="1.6" fill="${p.item.border}" />
+        `;
+      });
+      leaderSvg.innerHTML = svgMarkup;
+    }
+
+    // =========================================================================
+    // 8. RAYCAST HOVER, CLEAN CLICK VS DRAG (<5px) & DOUBLE-CLICK FOCUS
+    // =========================================================================
+    const raycaster = new THREE.Raycaster();
+    const pointerNdc = new THREE.Vector2();
+
+    function updatePointerNdc(clientX, clientY) {
+      const rect = canvas.getBoundingClientRect();
+      pointerNdc.x = ((clientX - rect.left) / rect.width) * 2 - 1;
+      pointerNdc.y = -((clientY - rect.top) / rect.height) * 2 + 1;
+    }
+
+    function raycastInteractive(clientX, clientY) {
+      updatePointerNdc(clientX, clientY);
+      raycaster.setFromCamera(pointerNdc, camera);
+
+      const visibleWireMeshes = wireObjects
+        .filter(wo => isWireVisibleInFilter(wo.data))
+        .map(wo => wo.mesh);
+      const wireHits = raycaster.intersectObjects(visibleWireMeshes, false);
+      if (wireHits.length > 0) {
+        return { kind: 'wire', wireId: wireHits[0].object.userData.wireId, point: wireHits[0].point };
+      }
+
+      const compHits = raycaster.intersectObjects(componentPickMeshes, false);
+      if (compHits.length > 0) {
+        const hitObj = compHits[0].object;
+        return {
+          kind: hitObj.userData.compId === 'lbl_roof' ? 'roof' : 'component',
+          compId: hitObj.userData.compId,
+          compInfo: hitObj.userData.compInfo,
+          point: compHits[0].point
+        };
+      }
+
+      const boardHits = raycaster.intersectObjects([breadboardBodyMesh, basePlatform], false);
+      if (boardHits.length > 0) {
+        return { kind: 'surface', point: boardHits[0].point };
+      }
+
+      return null;
+    }
+
+    let downX = 0;
+    let downY = 0;
+    let downButton = 0;
+
+    canvas.addEventListener('pointerdown', e => {
+      downX = e.clientX;
+      downY = e.clientY;
+      downButton = e.button;
+    });
+
+    canvas.addEventListener('pointermove', e => {
+      const hit = raycastInteractive(e.clientX, e.clientY);
+      if (hit && (hit.kind === 'wire' || hit.kind === 'roof' || hit.kind === 'component')) {
+        canvas.style.cursor = 'pointer';
+        if (hit.kind === 'wire') {
+          appState.hoveredWireId = hit.wireId;
+          appState.hoveredComponentId = null;
+        } else {
+          appState.hoveredWireId = null;
+          appState.hoveredComponentId = hit.compId;
+        }
+      } else {
+        canvas.style.cursor = 'grab';
+        appState.hoveredWireId = null;
+        appState.hoveredComponentId = null;
+      }
+      syncHudStatus();
+    });
+
+    canvas.addEventListener('pointerup', e => {
+      if (downButton !== 0) return;
+      const dist = Math.hypot(e.clientX - downX, e.clientY - downY);
+      if (dist < 5) {
+        const hit = raycastInteractive(e.clientX, e.clientY);
+        if (hit) {
+          if (hit.kind === 'roof') {
+            toggleRoofTouch();
+          } else if (hit.kind === 'wire') {
+            selectWire(hit.wireId, false);
+          }
+        }
+      }
+    });
+
+    canvas.addEventListener('dblclick', e => {
+      const hit = raycastInteractive(e.clientX, e.clientY);
+      if (hit && hit.point) {
+        const currentDist = camera.position.distanceTo(controls.target);
+        const targetDist = Math.max(3.6, Math.min(currentDist * 0.65, 5.4));
+        const viewDir = new THREE.Vector3().subVectors(camera.position, controls.target).normalize();
+        const nextPos = hit.point.clone().addScaledVector(viewDir, targetDist);
+        flyCameraTo(hit.point, nextPos);
+      }
+    });
+
+    // =========================================================================
+    // 9. SIMULATION CONTROLS, HUD STATUS & NAVIGATION PAD
+    // =========================================================================
+    function syncHudStatus() {
+      const dot = document.getElementById('hudIndicator');
+      const hudText = document.getElementById('hudStatusText');
+
+      if (appState.hoveredWireId) {
+        const w = WIRES_DATA.find(item => item.id === appState.hoveredWireId);
+        if (w) {
+          dot.className = 'w-2.5 h-2.5 rounded-full flex-shrink-0 bg-amber-400 shadow-[0_0_8px_#fbbf24]';
+          hudText.textContent = `🔍 ${w.id.toUpperCase()}: ${w.name} (${w.fromDesc} → ${w.toDesc})`;
+          return;
+        }
+      }
+
+      if (appState.hoveredComponentId) {
+        const comp = componentMeshGroups.get(appState.hoveredComponentId);
+        if (comp) {
+          dot.className = 'w-2.5 h-2.5 rounded-full flex-shrink-0 bg-sky-400 shadow-[0_0_8px_#38bdf8]';
+          hudText.textContent = `🔍 ${comp.info.fullName} • ${comp.info.detail}`;
+          return;
+        }
+      }
+
+      const effectiveLedOn = !appState.deepSleep && appState.ledOn && appState.brightness > 0;
+      if (appState.deepSleep) {
+        dot.className = 'w-2.5 h-2.5 rounded-full flex-shrink-0 bg-purple-400 shadow-[0_0_8px_#c084fc]';
+        hudText.textContent = 'NGỦ SÂU (Deep Sleep 0.01mA) • Chạm Nóc để đánh thức';
+      } else {
+        dot.className = 'w-2.5 h-2.5 rounded-full flex-shrink-0 bg-emerald-400 shadow-[0_0_8px_#34d399]';
+        const ledTxt = effectiveLedOn ? `LED ${appState.brightness}%` : 'LED Tắt';
+        hudText.textContent = `THỨC: Bo sạc xuất 5.0V • ${ledTxt}`;
+      }
+    }
+
+    function syncHardwareVisuals() {
+      const effectiveLedOn = !appState.deepSleep && appState.ledOn && appState.brightness > 0;
+      const ratio = effectiveLedOn ? (appState.brightness / 100) : 0;
+
+      roofLedBulbMeshes.forEach(bulb => {
+        bulb.material.emissiveIntensity = ratio * 1.6;
+        bulb.material.color.setHex(effectiveLedOn ? 0xfef08a : 0x475569);
+      });
+      if (lightConeMesh) {
+        lightConeMesh.visible = effectiveLedOn;
+        lightConeMesh.material.opacity = 0.04 + ratio * 0.16;
+      }
+      roofWarmLight.intensity = ratio * 2.1;
+
+      if (window.mosLedMat) {
+        window.mosLedMat.color.setHex(effectiveLedOn ? 0x22c55e : 0x334155);
+      }
+
+      tftScreenCtrl.updateTexture();
+      syncHudStatus();
+    }
+
+    function toggleRoofTouch() {
+      if (appState.deepSleep) {
+        toggleDeepSleep();
+        return;
+      }
+      appState.ledOn = !appState.ledOn;
+      const btn = document.getElementById('btnTouch');
+      const lbl = document.getElementById('touchLabel');
+      if (appState.ledOn) {
+        btn.className = 'px-2.5 py-1.5 rounded-lg text-xs font-bold bg-amber-500/25 border border-amber-400 text-amber-200 hover:bg-amber-500/35 active:scale-95 transition flex items-center gap-1';
+        lbl.textContent = 'Chạm Nóc Lăng: Đèn Sáng';
+      } else {
+        btn.className = 'px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-slate-800 border border-slate-700 text-slate-300 hover:bg-slate-700 active:scale-95 transition flex items-center gap-1';
+        lbl.textContent = 'Chạm Nóc Lăng: Đèn Tắt';
+      }
+      syncHardwareVisuals();
+    }
+
+    function toggleDeepSleep() {
+      appState.deepSleep = !appState.deepSleep;
+      const btn = document.getElementById('btnSleep');
+      const lbl = document.getElementById('sleepLabel');
+      if (appState.deepSleep) {
+        btn.className = 'px-2.5 py-1.5 rounded-lg text-xs font-bold bg-purple-700 border border-purple-400 text-purple-100 hover:bg-purple-600 active:scale-95 transition flex items-center gap-1';
+        lbl.textContent = 'Giữ Nóc 2s: NGỦ SÂU';
+      } else {
+        btn.className = 'px-2.5 py-1.5 rounded-lg text-xs font-bold bg-emerald-600 border border-emerald-400 text-white hover:bg-emerald-500 active:scale-95 transition flex items-center gap-1';
+        lbl.textContent = 'Giữ Nóc 2s: Đang THỨC';
+      }
+      syncHardwareVisuals();
+    }
+
+    document.getElementById('btnTouch').addEventListener('click', toggleRoofTouch);
+    document.getElementById('btnSleep').addEventListener('click', toggleDeepSleep);
+
+    document.getElementById('brightnessSlider').addEventListener('input', e => {
+      appState.brightness = parseInt(e.target.value, 10);
+      document.getElementById('brightnessText').textContent = `${appState.brightness}%`;
+      if (appState.brightness > 0 && !appState.ledOn && !appState.deepSleep) {
+        toggleRoofTouch();
+        return;
+      }
+      syncHardwareVisuals();
+    });
+
+    document.getElementById('btnCharge').addEventListener('click', () => {
+      appState.charging = !appState.charging;
+      const btn = document.getElementById('btnCharge');
+      const lbl = document.getElementById('chargeLabel');
+      btn.className = appState.charging
+        ? 'px-2.5 py-1.5 rounded-lg text-xs font-bold bg-sky-600 border border-sky-400 text-white active:scale-95 transition flex items-center gap-1'
+        : 'px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-slate-800 border border-slate-700 text-slate-200 hover:bg-slate-700 active:scale-95 transition flex items-center gap-1';
+      lbl.textContent = appState.charging ? 'Đang sạc Type-C' : 'Sạc Type-C';
+    });
+
+    document.getElementById('btnAudio').addEventListener('click', () => {
+      appState.audioPlaying = !appState.audioPlaying;
+      const btn = document.getElementById('btnAudio');
+      const lbl = document.getElementById('audioLabel');
+      btn.className = appState.audioPlaying
+        ? 'px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-sky-500/20 border border-sky-400/60 text-sky-200 hover:bg-sky-500/30 active:scale-95 transition flex items-center gap-1'
+        : 'px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-slate-800 border border-slate-700 text-slate-300 hover:bg-slate-700 active:scale-95 transition flex items-center gap-1';
+      lbl.textContent = appState.audioPlaying ? 'Loa BT: Phát' : 'Loa BT: Tắt';
+    });
+
+    document.getElementById('btnLabels').addEventListener('click', () => {
+      const btn = document.getElementById('btnLabels');
+      const lbl = document.getElementById('labelsLabel');
+      if (appState.labelMode === 'compact') {
+        appState.labelMode = 'hover';
+        lbl.textContent = 'Nhãn: Di chuột';
+        btn.className = 'px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-amber-500/20 border border-amber-400/60 text-amber-200 hover:bg-amber-500/30 active:scale-95 transition flex items-center gap-1';
+      } else if (appState.labelMode === 'hover') {
+        appState.labelMode = 'hidden';
+        lbl.textContent = 'Nhãn: Ẩn';
+        btn.className = 'px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-slate-800 border border-slate-700 text-slate-300 hover:bg-slate-700 active:scale-95 transition flex items-center gap-1';
+      } else {
+        appState.labelMode = 'compact';
+        lbl.textContent = 'Nhãn: Nhỏ';
+        btn.className = 'px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-indigo-500/25 border border-indigo-400/60 text-indigo-200 hover:bg-indigo-500/35 active:scale-95 transition flex items-center gap-1';
+      }
+    });
+
+    document.querySelectorAll('.cam-btn').forEach(btn => {
+      btn.addEventListener('click', () => setCameraPreset(btn.dataset.cam));
+    });
+
+    let holdInterval = null;
+    function startHoldAction(fn) {
+      fn();
+      clearInterval(holdInterval);
+      holdInterval = setInterval(fn, 60);
+    }
+    function stopHoldAction() {
+      clearInterval(holdInterval);
+      holdInterval = null;
+    }
+
+    document.querySelectorAll('.nav-pan-btn').forEach(btn => {
+      const dir = btn.dataset.pan;
+      const stepFn = () => {
+        if (dir === 'up') panScreen(0, 1);
+        else if (dir === 'down') panScreen(0, -1);
+        else if (dir === 'left') panScreen(-1, 0);
+        else if (dir === 'right') panScreen(1, 0);
+      };
+      btn.addEventListener('pointerdown', e => { e.stopPropagation(); startHoldAction(stepFn); });
+      btn.addEventListener('pointerup', stopHoldAction);
+      btn.addEventListener('pointerleave', stopHoldAction);
+    });
+
+    document.getElementById('btnZoomIn').addEventListener('pointerdown', e => {
+      e.stopPropagation();
+      startHoldAction(() => zoomStep(0.9));
+    });
+    document.getElementById('btnZoomIn').addEventListener('pointerup', stopHoldAction);
+    document.getElementById('btnZoomIn').addEventListener('pointerleave', stopHoldAction);
+
+    document.getElementById('btnZoomOut').addEventListener('pointerdown', e => {
+      e.stopPropagation();
+      startHoldAction(() => zoomStep(1.12));
+    });
+    document.getElementById('btnZoomOut').addEventListener('pointerup', stopHoldAction);
+    document.getElementById('btnZoomOut').addEventListener('pointerleave', stopHoldAction);
+
+    document.getElementById('btnResetView').addEventListener('click', e => {
+      e.stopPropagation();
+      setCameraPreset('overview');
+    });
+
+    window.addEventListener('keydown', e => {
+      if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+      const k = e.key.toLowerCase();
+      if (k === 'w' || e.key === 'ArrowUp') panScreen(0, 1.2);
+      else if (k === 's' || e.key === 'ArrowDown') panScreen(0, -1.2);
+      else if (k === 'a' || e.key === 'ArrowLeft') panScreen(-1.2, 0);
+      else if (k === 'd' || e.key === 'ArrowRight') panScreen(1.2, 0);
+      else if (k === 'r') setCameraPreset('overview');
+      else if (e.key === '+' || e.key === '=') zoomStep(0.88);
+      else if (e.key === '-' || e.key === '_') zoomStep(1.14);
+    });
+
+    // =========================================================================
+    // 10. CHECKLIST FILTERING, WIRE SELECTION & PROGRESS TRACKING
+    // =========================================================================
+    function isWireVisibleInFilter(w) {
+      if (appState.activeFilter === 'ALL') return true;
+      if (appState.activeFilter === 'ROOF') return w.isRoof;
+      return w.group === appState.activeFilter;
+    }
+
+    document.querySelectorAll('.tab-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const filterKey = btn.dataset.filter;
+        appState.activeFilter = filterKey;
+        document.querySelectorAll('.tab-btn').forEach(b => {
+          const isAct = b.dataset.filter === filterKey;
+          if (isAct) {
+            b.className = 'tab-btn px-2 py-1 rounded-md text-[11px] font-bold bg-amber-500 text-slate-950';
+          } else if (b.dataset.filter === 'ROOF') {
+            b.className = 'tab-btn px-2 py-1 rounded-md text-[11px] font-semibold bg-slate-800 text-amber-300 border border-amber-500/40 hover:bg-slate-700';
+          } else {
+            b.className = 'tab-btn px-2 py-1 rounded-md text-[11px] font-semibold bg-slate-800 text-slate-300 hover:bg-slate-700';
+          }
+        });
+
+        if (filterKey === 'ROOF') setCameraPreset('underRoof');
+        else if (filterKey === 'B1') setCameraPreset('power');
+        else if (filterKey === 'B2' || filterKey === 'B3') setCameraPreset('esp_tft');
+
+        renderChecklist();
+      });
+    });
+
+    function selectWire(wireId, focusCam = true) {
+      appState.selectedWireId = wireId;
+      const w = WIRES_DATA.find(item => item.id === wireId);
+      if (!w) return;
+
+      const insp = document.getElementById('wireInspector');
+      insp.classList.remove('hidden');
+      document.getElementById('inspGroupBadge').textContent = w.isRoof ? '5 DÂY NÓC' : w.group;
+      document.getElementById('inspTitle').textContent = `${w.id.toUpperCase()}: ${w.name}`;
+      document.getElementById('inspFrom').textContent = w.fromDesc;
+      document.getElementById('inspTo').textContent = w.toDesc;
+      document.getElementById('inspNote').textContent = w.note;
+
+      if (focusCam) {
+        if (w.isRoof) {
+          setCameraPreset('underRoof');
+        } else {
+          const mid = w.from.clone().lerp(w.to, 0.5);
+          mid.y = Math.max(0.5, mid.y);
+          const viewDir = new THREE.Vector3().subVectors(camera.position, controls.target).normalize();
+          const nextPos = mid.clone().addScaledVector(viewDir, 5.4);
+          nextPos.y = Math.max(1.8, nextPos.y);
+          flyCameraTo(mid, nextPos);
+        }
+      }
+      renderChecklist();
+    }
+
+    document.getElementById('btnCloseInspector').addEventListener('click', () => {
+      appState.selectedWireId = null;
+      document.getElementById('wireInspector').classList.add('hidden');
+      renderChecklist();
+    });
+
+    document.getElementById('btnResetProgress').addEventListener('click', () => {
+      checkedSet.clear();
+      saveProgress();
+      renderChecklist();
+    });
+
+    function renderChecklist() {
+      document.getElementById('progressBadge').textContent = `${checkedSet.size} / ${WIRES_DATA.length}`;
+      const listEl = document.getElementById('checklistContainer');
+      const filtered = WIRES_DATA.filter(isWireVisibleInFilter);
+
+      listEl.innerHTML = filtered.map(w => {
+        const isSelected = appState.selectedWireId === w.id;
+        const isChecked = checkedSet.has(w.id);
+        const rowClass = isSelected
+          ? 'bg-amber-500/20 border-amber-400'
+          : (isChecked ? 'bg-slate-900/40 border-slate-800/70 opacity-60' : 'bg-slate-900/90 border-slate-800 hover:bg-slate-800/90');
+
+        return `
+          <div data-wire-row="${w.id}"
+            class="flex items-start gap-2.5 p-2 rounded-xl border cursor-pointer transition ${rowClass}">
+            <input type="checkbox" data-wire-chk="${w.id}" ${isChecked ? 'checked' : ''}
+              class="mt-0.5 w-4 h-4 rounded accent-emerald-500 cursor-pointer flex-shrink-0" />
+            <span class="mt-1 w-2.5 h-2.5 rounded-full flex-shrink-0 border border-white/40"
+              style="background-color:${w.hex}"></span>
+            <div class="flex-1 min-w-0">
+              <div class="flex items-center justify-between gap-1.5">
+                <span class="text-xs font-bold text-slate-100 truncate">${w.id.toUpperCase()}: ${w.name}</span>
+                <span class="text-[10px] font-bold px-1.5 py-0.5 rounded bg-slate-800 text-slate-300 flex-shrink-0">
+                  ${w.isRoof ? 'NÓC' : w.group}
+                </span>
+              </div>
+              <div class="text-[11px] text-slate-400 truncate mt-0.5">${w.fromDesc} → ${w.toDesc}</div>
+            </div>
+          </div>
+        `;
+      }).join('');
+
+      listEl.querySelectorAll('[data-wire-row]').forEach(row => {
+        row.addEventListener('click', () => selectWire(row.dataset.wireRow, true));
+      });
+      listEl.querySelectorAll('[data-wire-chk]').forEach(chk => {
+        chk.addEventListener('click', e => {
+          e.stopPropagation();
+          const wid = chk.dataset.wireChk;
+          if (checkedSet.has(wid)) checkedSet.delete(wid);
+          else checkedSet.add(wid);
+          saveProgress();
+          renderChecklist();
+        });
+      });
+    }
+
+    // =========================================================================
+    // 11. RESIZE & MAIN RENDER LOOP
+    // =========================================================================
+    function handleResize() {
+      const w = container.clientWidth || window.innerWidth;
+      const h = container.clientHeight || 420;
+      camera.aspect = w / h;
+      camera.updateProjectionMatrix();
+      renderer.setSize(w, h, false);
+    }
+    window.addEventListener('resize', handleResize);
+
+    function animate(nowMs) {
+      requestAnimationFrame(animate);
+      const t = nowMs * 0.001;
+
+      if (camAnim.active) {
+        controls.target.lerp(camAnim.goalTarget, 0.14);
+        camera.position.lerp(camAnim.goalPos, 0.14);
+        if (
+          controls.target.distanceTo(camAnim.goalTarget) < 0.015 &&
+          camera.position.distanceTo(camAnim.goalPos) < 0.015
+        ) {
+          controls.target.copy(camAnim.goalTarget);
+          camera.position.copy(camAnim.goalPos);
+          camAnim.active = false;
+        }
+      }
+      controls.update();
+
+      if (window.chgLedMat) {
+        if (appState.charging) {
+          window.chgLedMat.color.setHex(Math.sin(t * 7) > 0 ? 0xef4444 : 0x7f1d1d);
+        } else {
+          window.chgLedMat.color.setHex(appState.deepSleep ? 0x334155 : 0x38bdf8);
+        }
+      }
+
+      if (window.spkWaveRing) {
+        const activeAudio = !appState.deepSleep && appState.audioPlaying;
+        window.spkWaveRing.visible = activeAudio;
+        if (activeAudio) {
+          const pulse = (t * 1.4) % 1;
+          const sc = 1 + pulse * 0.65;
+          window.spkWaveRing.scale.set(sc, sc, 1);
+          window.spkWaveRing.material.opacity = (1 - pulse) * 0.75;
+        }
+      }
+
+      componentMeshGroups.forEach((groupObj, compId) => {
+        const isHov = appState.hoveredComponentId === compId;
+        groupObj.meshes.forEach(m => {
+          if (m.material && m.material.emissive && compId !== 'lbl_led') {
+            m.material.emissive.setHex(isHov ? 0x38bdf8 : 0x000000);
+            m.material.emissiveIntensity = isHov ? 0.35 : 0.0;
+          }
+        });
+      });
+
+      const pulseScale = 1.0 + Math.sin(t * 8) * 0.28;
+      wireObjects.forEach(wo => {
+        const isVis = isWireVisibleInFilter(wo.data);
+        const isSel = appState.selectedWireId === wo.data.id;
+        const isHov = appState.hoveredWireId === wo.data.id;
+
+        if (isSel || isHov) {
+          wo.mat.opacity = 1.0;
+          wo.mat.emissive.setHex(0xfbbf24);
+          wo.mat.emissiveIntensity = isSel ? 0.65 : 0.4;
+        } else {
+          wo.mat.opacity = isVis ? 0.96 : 0.14;
+          wo.mat.emissive.setHex(0x000000);
+          wo.mat.emissiveIntensity = 0;
+        }
+
+        wo.ringA.visible = isSel;
+        wo.ringB.visible = isSel;
+        if (isSel) {
+          wo.ringA.scale.set(pulseScale, pulseScale, 1);
+          wo.ringB.scale.set(pulseScale, pulseScale, 1);
+        }
+      });
+
+      const w = container.clientWidth || window.innerWidth;
+      const h = container.clientHeight || 420;
+      renderer.render(scene, camera);
+      updateLabelsOverlay(w, h);
+    }
+
+    handleResize();
+    syncHardwareVisuals();
+    renderChecklist();
+    requestAnimationFrame(animate);
+  </script>
+</body>
+</html>
